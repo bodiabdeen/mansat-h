@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { db, auth } from '../../firebase'
 import {
   collection, getDocs, query, where, doc, getDoc,
-  addDoc, updateDoc
+  addDoc, updateDoc, setDoc
 } from 'firebase/firestore'
 
 const BADGES = ['⭐', '🏆', '🎯', '🔥', '💡', '🌟', '🥇', '🎖️']
@@ -12,13 +12,17 @@ const labels = {
     title: 'الطلاب', noStudents: 'لا يوجد طلاب بعد', points: 'النقاط',
     addPoints: 'إضافة نقاط', note: 'ملاحظة', add: 'إضافة', badge: 'منح شارة',
     history: 'السجل', grade: 'الدرجة', giveBadge: 'منح', addGrade: 'إضافة درجة',
-    gradeLabel: 'الدرجة (مثال: A+)', totalPoints: 'مجموع النقاط', badges: 'الشارات'
+    gradeLabel: 'الدرجة (مثال: A+)', totalPoints: 'مجموع النقاط', badges: 'الشارات',
+    assignPackage: 'تعيين باقة', selectPackage: 'اختر الباقة', assign: 'تعيين',
+    currentPackage: 'الباقة الحالية', lessonsLeft: 'حصص متبقية'
   },
   en: {
     title: 'Students', noStudents: 'No students yet', points: 'Points',
     addPoints: 'Add Points', note: 'Note', add: 'Add', badge: 'Give Badge',
     history: 'History', grade: 'Grade', giveBadge: 'Give', addGrade: 'Add Grade',
-    gradeLabel: 'Grade (e.g. A+)', totalPoints: 'Total Points', badges: 'Badges'
+    gradeLabel: 'Grade (e.g. A+)', totalPoints: 'Total Points', badges: 'Badges',
+    assignPackage: 'Assign Package', selectPackage: 'Select Package', assign: 'Assign',
+    currentPackage: 'Current Package', lessonsLeft: 'lessons left'
   }
 }
 
@@ -27,6 +31,8 @@ export default function Students({ lang }) {
   const [students, setStudents] = useState([])
   const [selected, setSelected] = useState(null)
   const [rewards, setRewards] = useState([])
+  const [packages, setPackages] = useState([])
+  const [pkgForm, setPkgForm] = useState({ packageId: '' })
   const [form, setForm] = useState({ points: '', note: '', grade: '', badge: '' })
   const [loading, setLoading] = useState(false)
 
@@ -40,6 +46,12 @@ export default function Students({ lang }) {
       return { id: data.studentId, ...u.data(), pkg: data }
     }))
     setStudents(list)
+
+    // fetch all packages by this teacher
+    const pSnap = await getDocs(query(
+      collection(db, 'packages'), where('teacherId', '==', auth.currentUser.uid)
+    ))
+    setPackages(pSnap.docs.map(d => ({ id: d.id, ...d.data() })))
   }
 
   const fetchRewards = async (studentId) => {
@@ -56,6 +68,26 @@ export default function Students({ lang }) {
   const selectStudent = async (s) => {
     setSelected(s)
     await fetchRewards(s.id)
+  }
+
+  const assignPackage = async (studentId) => {
+    const pkg = packages.find(p => p.id === pkgForm.packageId)
+    if (!pkg) return
+    setLoading(true)
+    await setDoc(doc(db, 'studentPackages', studentId), {
+      packageId: pkg.id,
+      packageName: pkg.name,
+      teacherId: auth.currentUser.uid,
+      totalLessons: pkg.lessons,
+      remainingLessons: pkg.lessons,
+      price: pkg.price,
+      studentId,
+      selectedAt: new Date(),
+      status: 'active'
+    })
+    await fetchStudents()
+    setPkgForm({ packageId: '' })
+    setLoading(false)
   }
 
   const addReward = async (type) => {
@@ -103,6 +135,7 @@ export default function Students({ lang }) {
 
       {selected && (
         <div className="space-y-4">
+
           {/* Stats bar */}
           <div className="bg-indigo-50 dark:bg-indigo-900 rounded-2xl p-4 flex gap-6">
             <div className="text-center">
@@ -117,6 +150,29 @@ export default function Students({ lang }) {
                   : allBadges.map((b, i) => <span key={i} className="text-xl">{b}</span>)
                 }
               </div>
+            </div>
+          </div>
+
+          {/* Assign Package */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow p-4 space-y-3">
+            <p className="font-semibold text-sm text-gray-500 dark:text-gray-400">📦 {l.assignPackage}</p>
+            {selected.pkg ? (
+              <div className="text-sm text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900 rounded-xl px-3 py-2">
+                ✅ {l.currentPackage}: <strong>{selected.pkg.packageName}</strong> — {selected.pkg.remainingLessons} {l.lessonsLeft}
+              </div>
+            ) : null}
+            <div className="flex gap-2">
+              <select className="input" value={pkgForm.packageId}
+                onChange={e => setPkgForm({ packageId: e.target.value })}>
+                <option value="">{l.selectPackage}</option>
+                {packages.map(p => (
+                  <option key={p.id} value={p.id}>{p.name} ({p.lessons} {l.lessonsLeft})</option>
+                ))}
+              </select>
+              <button onClick={() => assignPackage(selected.id)} disabled={loading || !pkgForm.packageId}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition whitespace-nowrap">
+                {loading ? '...' : l.assign}
+              </button>
             </div>
           </div>
 
@@ -186,6 +242,7 @@ export default function Students({ lang }) {
               </div>
             ))}
           </div>
+
         </div>
       )}
     </div>
