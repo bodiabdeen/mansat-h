@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { db, auth } from '../../firebase'
 import {
   collection, getDocs, query, where, doc, getDoc,
-  addDoc, updateDoc, setDoc
+  addDoc, updateDoc, setDoc, deleteDoc
 } from 'firebase/firestore'
 
 const BADGES = ['⭐', '🏆', '🎯', '🔥', '💡', '🌟', '🥇', '🎖️']
@@ -13,16 +13,18 @@ const labels = {
     addPoints: 'إضافة نقاط', note: 'ملاحظة', add: 'إضافة', badge: 'منح شارة',
     history: 'السجل', grade: 'الدرجة', giveBadge: 'منح', addGrade: 'إضافة درجة',
     gradeLabel: 'الدرجة (مثال: A+)', totalPoints: 'مجموع النقاط', badges: 'الشارات',
-    assignPackage: 'تعيين باقة', selectPackage: 'اختر الباقة', assign: 'تعيين',
-    currentPackage: 'الباقة الحالية', lessonsLeft: 'حصص متبقية'
+    packages: 'الباقات', noPackages: 'لا توجد باقات', used: 'مستخدم',
+    of: 'من', assignPackage: 'تعيين باقة', selectPackage: 'اختر الباقة', assign: 'تعيين',
+    lessonsLeft: 'حصص متبقية', remove: 'إزالة'
   },
   en: {
     title: 'Students', noStudents: 'No students yet', points: 'Points',
     addPoints: 'Add Points', note: 'Note', add: 'Add', badge: 'Give Badge',
     history: 'History', grade: 'Grade', giveBadge: 'Give', addGrade: 'Add Grade',
     gradeLabel: 'Grade (e.g. A+)', totalPoints: 'Total Points', badges: 'Badges',
-    assignPackage: 'Assign Package', selectPackage: 'Select Package', assign: 'Assign',
-    currentPackage: 'Current Package', lessonsLeft: 'lessons left'
+    packages: 'Packages', noPackages: 'No packages', used: 'used',
+    of: 'of', assignPackage: 'Assign Package', selectPackage: 'Select Package', assign: 'Assign',
+    lessonsLeft: 'lessons', remove: 'Remove'
   }
 }
 
@@ -32,19 +34,25 @@ export default function Students({ lang }) {
   const [selected, setSelected] = useState(null)
   const [rewards, setRewards] = useState([])
   const [packages, setPackages] = useState([])
+  const [studentPackages, setStudentPackages] = useState([])
   const [pkgForm, setPkgForm] = useState({ packageId: '' })
   const [form, setForm] = useState({ points: '', note: '', grade: '', badge: '' })
   const [loading, setLoading] = useState(false)
 
   const fetchStudents = async () => {
+    // Get all unique students from studentPackages
     const pkgSnap = await getDocs(query(
       collection(db, 'studentPackages'), where('teacherId', '==', auth.currentUser.uid)
     ))
-    const list = await Promise.all(pkgSnap.docs.map(async d => {
-      const data = d.data()
-      const u = await getDoc(doc(db, 'users', data.studentId))
-      return { id: data.studentId, ...u.data(), pkg: data }
+    
+    const studentIds = new Set()
+    pkgSnap.docs.forEach(d => studentIds.add(d.data().studentId))
+
+    const list = await Promise.all(Array.from(studentIds).map(async (studentId) => {
+      const u = await getDoc(doc(db, 'users', studentId))
+      return { id: studentId, ...u.data() }
     }))
+    
     setStudents(list)
 
     // fetch all packages by this teacher
@@ -54,7 +62,17 @@ export default function Students({ lang }) {
     setPackages(pSnap.docs.map(d => ({ id: d.id, ...d.data() })))
   }
 
-  const fetchRewards = async (studentId) => {
+  const fetchStudentData = async (studentId) => {
+    // Get all packages for this student
+    const pkgSnap = await getDocs(query(
+      collection(db, 'studentPackages'),
+      where('studentId', '==', studentId),
+      where('teacherId', '==', auth.currentUser.uid)
+    ))
+    const pkgs = pkgSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+    setStudentPackages(pkgs)
+
+    // Get rewards
     const snap = await getDocs(query(
       collection(db, 'rewards'), where('studentId', '==', studentId)
     ))
@@ -67,14 +85,26 @@ export default function Students({ lang }) {
 
   const selectStudent = async (s) => {
     setSelected(s)
-    await fetchRewards(s.id)
+    await fetchStudentData(s.id)
   }
 
   const assignPackage = async (studentId) => {
     const pkg = packages.find(p => p.id === pkgForm.packageId)
     if (!pkg) return
     setLoading(true)
-    await setDoc(doc(db, 'studentPackages', studentId), {
+
+    // Check if student already has this package
+    const existing = studentPackages.find(sp => sp.packageId === pkg.id)
+    
+    if (existing) {
+      // Reset if already assigned
+      alert('This package is already assigned to the student')
+      setLoading(false)
+      return
+    }
+
+    const newDocId = `${studentId}_${pkg.id}`
+    await setDoc(doc(db, 'studentPackages', newDocId), {
       packageId: pkg.id,
       packageName: pkg.name,
       teacherId: auth.currentUser.uid,
@@ -85,9 +115,17 @@ export default function Students({ lang }) {
       selectedAt: new Date(),
       status: 'active'
     })
-    await fetchStudents()
+    
+    await fetchStudentData(studentId)
     setPkgForm({ packageId: '' })
     setLoading(false)
+  }
+
+  const removePackage = async (packageDocId) => {
+    await deleteDoc(doc(db, 'studentPackages', packageDocId))
+    if (selected) {
+      await fetchStudentData(selected.id)
+    }
   }
 
   const addReward = async (type) => {
@@ -107,7 +145,7 @@ export default function Students({ lang }) {
       createdAt: new Date()
     })
     setForm({ points: '', note: '', grade: '', badge: '' })
-    await fetchRewards(selected.id)
+    await fetchStudentData(selected.id)
     setLoading(false)
   }
 
@@ -140,10 +178,10 @@ export default function Students({ lang }) {
           <div className="bg-indigo-50 dark:bg-indigo-900 rounded-2xl p-4 flex gap-6">
             <div className="text-center">
               <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-300">{totalPoints}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">{l.totalPoints}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">⭐ {l.totalPoints}</p>
             </div>
             <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{l.badges}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">🏅 {l.badges}</p>
               <div className="flex gap-1 flex-wrap">
                 {allBadges.length === 0
                   ? <span className="text-gray-400 text-sm">—</span>
@@ -153,26 +191,56 @@ export default function Students({ lang }) {
             </div>
           </div>
 
-          {/* Assign Package */}
+          {/* Student Packages */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow p-4 space-y-3">
-            <p className="font-semibold text-sm text-gray-500 dark:text-gray-400">📦 {l.assignPackage}</p>
-            {selected.pkg ? (
-              <div className="text-sm text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900 rounded-xl px-3 py-2">
-                ✅ {l.currentPackage}: <strong>{selected.pkg.packageName}</strong> — {selected.pkg.remainingLessons} {l.lessonsLeft}
-              </div>
-            ) : null}
-            <div className="flex gap-2">
-              <select className="input" value={pkgForm.packageId}
-                onChange={e => setPkgForm({ packageId: e.target.value })}>
-                <option value="">{l.selectPackage}</option>
-                {packages.map(p => (
-                  <option key={p.id} value={p.id}>{p.name} ({p.lessons} {l.lessonsLeft})</option>
+            <p className="font-semibold text-sm text-gray-500 dark:text-gray-400">📦 {l.packages}</p>
+            
+            {studentPackages.length === 0 ? (
+              <p className="text-sm text-gray-400">{l.noPackages}</p>
+            ) : (
+              <div className="space-y-2">
+                {studentPackages.map(pkg => (
+                  <div key={pkg.id} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3 flex items-center justify-between">
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-800 dark:text-white">{pkg.packageName}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {pkg.totalLessons - pkg.remainingLessons} {l.used} / {pkg.totalLessons} {l.lessonsLeft}
+                      </p>
+                      <div className="w-full bg-gray-300 dark:bg-gray-600 rounded-full h-1.5 mt-1">
+                        <div className="bg-indigo-500 h-1.5 rounded-full"
+                          style={{ width: `${((pkg.totalLessons - pkg.remainingLessons) / pkg.totalLessons) * 100}%` }} />
+                      </div>
+                    </div>
+                    <button onClick={() => removePackage(pkg.id)}
+                      className="text-red-400 hover:text-red-600 text-xs px-2 py-1 rounded ml-2 border border-red-200 hover:border-red-400 transition whitespace-nowrap">
+                      {l.remove}
+                    </button>
+                  </div>
                 ))}
-              </select>
-              <button onClick={() => assignPackage(selected.id)} disabled={loading || !pkgForm.packageId}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition whitespace-nowrap">
-                {loading ? '...' : l.assign}
-              </button>
+              </div>
+            )}
+
+            {/* Assign New Package */}
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-semibold">{l.assignPackage}</p>
+              <div className="flex gap-2">
+                <select className="input flex-1" value={pkgForm.packageId}
+                  onChange={e => setPkgForm({ packageId: e.target.value })}>
+                  <option value="">{l.selectPackage}</option>
+                  {packages.map(p => {
+                    const isAssigned = studentPackages.some(sp => sp.packageId === p.id)
+                    return (
+                      <option key={p.id} value={p.id} disabled={isAssigned}>
+                        {p.name} ({p.lessons} {l.lessonsLeft}) {isAssigned ? '✓ ' + l.used : ''}
+                      </option>
+                    )
+                  })}
+                </select>
+                <button onClick={() => assignPackage(selected.id)} disabled={loading || !pkgForm.packageId}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition whitespace-nowrap">
+                  {loading ? '...' : l.assign}
+                </button>
+              </div>
             </div>
           </div>
 

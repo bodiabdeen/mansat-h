@@ -7,13 +7,13 @@ const labels = {
     title: 'لوحة التحكم', totalStudents: 'الطلاب', totalSlots: 'المواعيد',
     bookedSlots: 'المحجوزة', totalPackages: 'الباقات', upcomingSlots: 'المواعيد القادمة',
     noUpcoming: 'لا توجد مواعيد قادمة', pendingAssignments: 'واجبات معلقة',
-    minutes: 'دقيقة', welcome: 'أهلاً'
+    minutes: 'دقيقة', welcome: 'أهلاً', packages: 'عدد الباقات المعطاة'
   },
   en: {
     title: 'Dashboard', totalStudents: 'Students', totalSlots: 'Slots',
     bookedSlots: 'Booked', totalPackages: 'Packages', upcomingSlots: 'Upcoming Slots',
     noUpcoming: 'No upcoming slots', pendingAssignments: 'Pending Assignments',
-    minutes: 'min', welcome: 'Welcome'
+    minutes: 'min', welcome: 'Welcome', packages: 'Packages Assigned'
   }
 }
 
@@ -26,24 +26,36 @@ export default function TeacherDashboard({ lang, userData }) {
     const fetch = async () => {
       const uid = auth.currentUser.uid
 
-      const [pkgSnap, slotSnap, studentSnap, assignSnap] = await Promise.all([
-        getDocs(query(collection(db, 'packages'), where('teacherId', '==', uid))),
-        getDocs(query(collection(db, 'slots'), where('teacherId', '==', uid))),
-        getDocs(query(collection(db, 'studentPackages'), where('teacherId', '==', uid))),
-        getDocs(query(collection(db, 'assignments'), where('teacherId', '==', uid)))
-      ])
+      // Get packages count
+      const pkgSnap = await getDocs(query(collection(db, 'packages'), where('teacherId', '==', uid)))
+      
+      // Get student packages count (how many packages assigned to students)
+      const stdPkgSnap = await getDocs(query(
+        collection(db, 'studentPackages'), where('teacherId', '==', uid)
+      ))
 
+      // Get slots
+      const slotSnap = await getDocs(query(collection(db, 'slots'), where('teacherId', '==', uid)))
       const slots = slotSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+      
+      // Get unique students
+      const studentIds = new Set(stdPkgSnap.docs.map(d => d.data().studentId))
+
+      // Get upcoming slots
       const now = new Date()
       const upcomingList = slots
         .filter(s => new Date(s.date + 'T' + s.time) > now)
         .sort((a, b) => new Date(a.date + 'T' + a.time) - new Date(b.date + 'T' + b.time))
         .slice(0, 5)
 
+      // Get pending assignments
+      const assignSnap = await getDocs(query(
+        collection(db, 'assignments'), where('teacherId', '==', uid)
+      ))
       const pending = assignSnap.docs.filter(d => d.data().status === 'pending').length
 
       setStats({
-        students: studentSnap.size,
+        students: studentIds.size,
         slots: slots.length,
         booked: slots.filter(s => s.booked).length,
         packages: pkgSnap.size,

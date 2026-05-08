@@ -1,25 +1,27 @@
 import { useEffect, useState } from 'react'
 import { db, auth } from '../../firebase'
-import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore'
+import { collection, getDocs, query, where } from 'firebase/firestore'
 
 const labels = {
   ar: {
-    title: 'لوحة التحكم', welcome: 'أهلاً', myPackage: 'باقتي',
+    title: 'لوحة التحكم', welcome: 'أهلاً', myPackages: 'باقاتي',
     remaining: 'متبقي', total: 'الإجمالي', upcomingBookings: 'حجوزاتي القادمة',
     noBookings: 'لا توجد حجوزات قادمة', pendingAssignments: 'واجبات معلقة',
-    totalPoints: 'نقاطي', badges: 'شاراتي', minutes: 'دقيقة', noPackage: 'لا توجد باقة'
+    totalPoints: 'نقاطي', badges: 'شاراتي', minutes: 'دقيقة', noPackages: 'لا توجد باقات',
+    used: 'مستخدم', of: 'من'
   },
   en: {
-    title: 'Dashboard', welcome: 'Welcome', myPackage: 'My Package',
+    title: 'Dashboard', welcome: 'Welcome', myPackages: 'My Packages',
     remaining: 'Remaining', total: 'Total', upcomingBookings: 'Upcoming Bookings',
     noBookings: 'No upcoming bookings', pendingAssignments: 'Pending Assignments',
-    totalPoints: 'My Points', badges: 'My Badges', minutes: 'min', noPackage: 'No Package'
+    totalPoints: 'My Points', badges: 'My Badges', minutes: 'min', noPackages: 'No Packages',
+    used: 'used', of: 'of'
   }
 }
 
 export default function StudentDashboard({ lang, userData }) {
   const l = labels[lang]
-  const [myPackage, setMyPackage] = useState(null)
+  const [myPackages, setMyPackages] = useState([])
   const [bookings, setBookings] = useState([])
   const [pending, setPending] = useState(0)
   const [points, setPoints] = useState(0)
@@ -29,9 +31,13 @@ export default function StudentDashboard({ lang, userData }) {
     const fetch = async () => {
       const uid = auth.currentUser.uid
 
-      // Package
-      const pkgSnap = await getDoc(doc(db, 'studentPackages', uid))
-      if (pkgSnap.exists()) setMyPackage(pkgSnap.data())
+      // Get all packages for this student
+      const pkgSnap = await getDocs(query(
+        collection(db, 'studentPackages'),
+        where('studentId', '==', uid)
+      ))
+      const packages = pkgSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+      setMyPackages(packages)
 
       // Upcoming bookings
       const bookSnap = await getDocs(query(
@@ -67,7 +73,7 @@ export default function StudentDashboard({ lang, userData }) {
   }, [])
 
   return (
-    <div className="max-w-xl mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto space-y-6">
       <div>
         <h2 className="text-xl font-bold text-indigo-600 dark:text-indigo-400">📊 {l.title}</h2>
         <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
@@ -75,21 +81,39 @@ export default function StudentDashboard({ lang, userData }) {
         </p>
       </div>
 
-      {/* Package Progress */}
-      <div className="bg-indigo-50 dark:bg-indigo-900 rounded-2xl p-4 space-y-2">
-        <p className="font-semibold text-indigo-700 dark:text-indigo-300">📦 {l.myPackage}</p>
-        {myPackage ? (
-          <>
-            <p className="font-bold dark:text-white">{myPackage.packageName}</p>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-              <div className="bg-indigo-500 h-2 rounded-full transition-all"
-                style={{ width: `${(myPackage.remainingLessons / myPackage.totalLessons) * 100}%` }} />
-            </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {l.remaining}: {myPackage.remainingLessons} / {l.total}: {myPackage.totalLessons}
-            </p>
-          </>
-        ) : <p className="text-gray-400 text-sm">{l.noPackage}</p>}
+      {/* My Packages */}
+      <div className="space-y-3">
+        <p className="font-semibold text-sm text-gray-500 dark:text-gray-400">📦 {l.myPackages}</p>
+        {myPackages.length === 0 ? (
+          <div className="bg-yellow-50 dark:bg-yellow-900 rounded-2xl p-4 text-center text-sm text-yellow-700 dark:text-yellow-300">
+            {l.noPackages}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {myPackages.map(pkg => (
+              <div key={pkg.id} className="bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-900 dark:to-blue-900 rounded-2xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <p className="font-bold text-gray-800 dark:text-white">{pkg.packageName}</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-300">
+                      {pkg.totalLessons - pkg.remainingLessons} {l.used} / {pkg.totalLessons} {l.of}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-300">{pkg.remainingLessons}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{l.remaining}</p>
+                  </div>
+                </div>
+                
+                {/* Progress bar */}
+                <div className="w-full bg-indigo-200 dark:bg-indigo-800 rounded-full h-2">
+                  <div className="bg-indigo-600 h-2 rounded-full transition-all"
+                    style={{ width: `${((pkg.totalLessons - pkg.remainingLessons) / pkg.totalLessons) * 100}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Stats Row */}
@@ -118,6 +142,7 @@ export default function StudentDashboard({ lang, userData }) {
               className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
               <div>
                 <p className="text-sm font-medium dark:text-white">📅 {b.date} — 🕐 {b.time}</p>
+                <p className="text-xs text-gray-400">📦 {b.packageName}</p>
                 <p className="text-xs text-gray-400">⏱ {b.duration} {l.minutes}</p>
               </div>
               <span className="text-xs bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300 px-2 py-0.5 rounded-full">
