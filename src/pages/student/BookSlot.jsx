@@ -12,9 +12,10 @@ const labels = {
     noBookings: 'لا توجد حجوزات', minutes: 'دقيقة', booked: 'محجوز',
     cancelWarning: 'تنبيه: الإلغاء خلال 48 ساعة سيُحتسب كحصة مستهلكة',
     missed: 'غياب (محتسب)', confirmed: 'مؤكد', noPackage: 'يجب تفعيل باقة أولاً',
-    selectPackage: 'اختر الباقة المراد استخدام حصة منها', lessonUsedFrom: 'سيتم استخدام حصة من',
+    selectPackage: 'اختر الباقة المراد استخدام حصة منها', lessonUsedFrom: 'حصص متبقية',
     joinNow: 'انضم للحصة الآن', linkSoon: 'الرابط سيظهر قبل 15 دقيقة',
-    teacher: 'المعلم'
+    teacher: 'المعلم', selectTeacher: 'اختر معلماً', allTeachers: 'جميع المعلمين',
+    noTeachers: 'لا يوجد معلمون بعد', teacherSlots: 'مواعيد المعلم'
   },
   en: {
     title: 'Book a Slot', myBookings: 'My Bookings', available: 'Available Slots',
@@ -22,14 +23,17 @@ const labels = {
     noBookings: 'No bookings yet', minutes: 'min', booked: 'Booked',
     cancelWarning: 'Warning: Cancelling within 48 hours counts as a used lesson',
     missed: 'Missed (counted)', confirmed: 'Confirmed', noPackage: 'Please activate a package first',
-    selectPackage: 'Select which package to use', lessonUsedFrom: 'Will use lesson from',
+    selectPackage: 'Select which package to use', lessonUsedFrom: 'lessons left',
     joinNow: 'Join Lesson Now', linkSoon: 'Link appears 15 min before',
-    teacher: 'Teacher'
+    teacher: 'Teacher', selectTeacher: 'Select a Teacher', allTeachers: 'All Teachers',
+    noTeachers: 'No teachers yet', teacherSlots: "Teacher's Slots"
   }
 }
 
 export default function BookSlot({ lang }) {
   const l = labels[lang]
+  const [teachers, setTeachers] = useState([])
+  const [selectedTeacher, setSelectedTeacher] = useState(null)
   const [slots, setSlots] = useState([])
   const [myBookings, setMyBookings] = useState([])
   const [myPackages, setMyPackages] = useState([])
@@ -38,35 +42,47 @@ export default function BookSlot({ lang }) {
   const [selectedSlotId, setSelectedSlotId] = useState(null)
   const [selectedPackageId, setSelectedPackageId] = useState(null)
 
-  const fetchData = async () => {
-    // My packages
+  const fetchTeachers = async () => {
+    const snap = await getDocs(query(collection(db, 'users'), where('role', '==', 'teacher')))
+    setTeachers(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+  }
+
+  const fetchPackages = async () => {
     const pkgSnap = await getDocs(query(
       collection(db, 'studentPackages'),
       where('studentId', '==', auth.currentUser.uid)
     ))
     const pkgs = pkgSnap.docs.map(d => ({ id: d.id, ...d.data() }))
     setMyPackages(pkgs.filter(p => p.remainingLessons > 0))
+  }
 
-    // Available slots (not booked, upcoming only)
-    const slotsSnap = await getDocs(query(collection(db, 'slots'), where('booked', '==', false)))
+  const fetchSlots = async (teacherId) => {
+    const q = teacherId
+      ? query(collection(db, 'slots'), where('teacherId', '==', teacherId), where('booked', '==', false))
+      : query(collection(db, 'slots'), where('booked', '==', false))
+    const slotsSnap = await getDocs(q)
     const list = slotsSnap.docs.map(d => ({ id: d.id, ...d.data() }))
     list.sort((a, b) => new Date(a.date + 'T' + a.time) - new Date(b.date + 'T' + b.time))
     setSlots(list.filter(s => new Date(s.date + 'T' + s.time) > new Date()))
+  }
 
-    // My bookings — also fetch latest joinLink from slot
+  const fetchMyBookings = async () => {
     const bookSnap = await getDocs(query(
       collection(db, 'bookings'), where('studentId', '==', auth.currentUser.uid)
     ))
     const bookings = await Promise.all(bookSnap.docs.map(async d => {
       const data = { id: d.id, ...d.data() }
-      // get latest joinLink from slot
       try {
         const slotSnap = await getDoc(doc(db, 'slots', data.slotId))
         if (slotSnap.exists()) {
           data.joinLink = slotSnap.data().joinLink || ''
-          data.teacherName = slotSnap.data().teacherName || ''
         }
-      } catch (e) { 
+        // get teacher name
+        const teacherSnap = await getDoc(doc(db, 'users', data.teacherId))
+        if (teacherSnap.exists()) {
+          data.teacherName = teacherSnap.data().name || ''
+        }
+      } catch (e) {
         data.joinLink = ''
         data.teacherName = ''
       }
@@ -76,27 +92,36 @@ export default function BookSlot({ lang }) {
     setMyBookings(bookings)
   }
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => {
+    fetchTeachers()
+    fetchPackages()
+    fetchMyBookings()
+    fetchSlots(null)
+  }, [])
+
+  const handleSelectTeacher = (teacher) => {
+    setSelectedTeacher(teacher)
+    setSelectedSlotId(null)
+    setSelectedPackageId(null)
+    fetchSlots(teacher ? teacher.id : null)
+  }
 
   const bookSlot = async (slot) => {
     if (myPackages.length === 0) return alert(l.noPackage)
     if (!selectedPackageId) return alert(l.selectPackage)
-    
     const selectedPkg = myPackages.find(p => p.id === selectedPackageId)
     if (!selectedPkg || selectedPkg.remainingLessons <= 0) return alert('No lessons remaining')
 
     setLoading(true)
     try {
-      // Update slot - booked
       await updateDoc(doc(db, 'slots', slot.id), {
         booked: true, studentId: auth.currentUser.uid
       })
-
-      // Create booking record with package info
       await addDoc(collection(db, 'bookings'), {
         slotId: slot.id,
         studentId: auth.currentUser.uid,
         teacherId: slot.teacherId,
+        studentPackageId: selectedPkg.id,
         packageId: selectedPkg.packageId,
         packageName: selectedPkg.packageName,
         date: slot.date,
@@ -106,15 +131,14 @@ export default function BookSlot({ lang }) {
         joinLink: slot.joinLink || '',
         createdAt: new Date()
       })
-
-      // Deduct from this specific package
       await updateDoc(doc(db, 'studentPackages', selectedPkg.id), {
         remainingLessons: selectedPkg.remainingLessons - 1
       })
-
       setSelectedSlotId(null)
       setSelectedPackageId(null)
-      await fetchData()
+      await fetchPackages()
+      await fetchSlots(selectedTeacher ? selectedTeacher.id : null)
+      await fetchMyBookings()
     } catch (e) { console.error(e) }
     setLoading(false)
   }
@@ -135,19 +159,18 @@ export default function BookSlot({ lang }) {
         status: isMissed ? 'missed' : 'cancelled'
       })
       if (!isMissed) {
-        await updateDoc(doc(db, 'slots', booking.slotId), {
-          booked: false, studentId: null
-        })
-        // Refund to the package that was used
-        const pkgSnap = await getDoc(doc(db, 'studentPackages', booking.packageId))
-        if (pkgSnap.exists()) {
-          const pkg = pkgSnap.data()
-          await updateDoc(doc(db, 'studentPackages', booking.packageId), {
-            remainingLessons: pkg.remainingLessons + 1
-          })
+        await updateDoc(doc(db, 'slots', booking.slotId), { booked: false, studentId: null })
+        if (booking.studentPackageId) {
+          const pkgSnap = await getDoc(doc(db, 'studentPackages', booking.studentPackageId))
+          if (pkgSnap.exists()) {
+            await updateDoc(doc(db, 'studentPackages', booking.studentPackageId), {
+              remainingLessons: pkgSnap.data().remainingLessons + 1
+            })
+          }
         }
       }
-      await fetchData()
+      await fetchPackages()
+      await fetchMyBookings()
     } catch (e) { console.error(e) }
     setLoading(false)
   }
@@ -166,6 +189,12 @@ export default function BookSlot({ lang }) {
     if (minsUntil <= 60 && minsUntil > 15) return 'soon'
     return 'hidden'
   }
+
+  // Enrich slots with teacher name
+  const enrichedSlots = slots.map(slot => ({
+    ...slot,
+    teacherName: teachers.find(t => t.id === slot.teacherId)?.name || ''
+  }))
 
   return (
     <div className="max-w-xl mx-auto space-y-4">
@@ -186,59 +215,98 @@ export default function BookSlot({ lang }) {
 
       {/* Available Slots */}
       {tab === 'available' && (
-        <div className="space-y-3">
+        <div className="space-y-4">
+          {/* Package warning */}
           {myPackages.length === 0 && (
             <div className="bg-yellow-50 dark:bg-yellow-900 rounded-lg p-4 text-center text-sm text-yellow-700 dark:text-yellow-300">
               📦 {l.noPackage}
             </div>
           )}
 
-          {myPackages.length > 0 && slots.length === 0 && (
-            <p className="text-center text-gray-400">{l.noSlots}</p>
-          )}
-
-          {slots.map(slot => (
-            <div key={slot.id} className={`bg-white dark:bg-gray-800 rounded-2xl shadow p-4 space-y-3 border-2 transition
-              ${selectedSlotId === slot.id ? 'border-indigo-600' : 'border-transparent'}`}
-              onClick={() => selectedSlotId === slot.id ? setSelectedSlotId(null) : setSelectedSlotId(slot.id)}>
-              
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-bold dark:text-white">📅 {slot.date} — 🕐 {slot.time}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">⏱ {slot.duration} {l.minutes}</p>
-                </div>
-                <input type="radio" checked={selectedSlotId === slot.id} onChange={() => {}} 
-                  className="w-5 h-5 accent-indigo-600 cursor-pointer" />
-              </div>
-
-              {/* Package Selection */}
-              {selectedSlotId === slot.id && myPackages.length > 0 && (
-                <div className="space-y-2 border-t pt-3">
-                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">{l.selectPackage}</p>
-                  <div className="space-y-2">
-                    {myPackages.map(pkg => (
-                      <label key={pkg.id} className={`flex items-center gap-3 p-2 rounded-lg border-2 cursor-pointer transition
-                        ${selectedPackageId === pkg.id
-                          ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900'
-                          : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700'}`}>
-                        <input type="radio" name="package" checked={selectedPackageId === pkg.id}
-                          onChange={() => setSelectedPackageId(pkg.id)} className="accent-indigo-600" />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm dark:text-white">{pkg.packageName}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{pkg.remainingLessons} {l.lessonUsedFrom}</p>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-
-                  <button onClick={() => bookSlot(slot)} disabled={loading || !selectedPackageId}
-                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-4 py-2 rounded-lg transition font-semibold">
-                    {loading ? '...' : l.book}
+          {/* Teacher selector */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow p-4 space-y-3">
+            <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">👨‍🏫 {l.selectTeacher}</p>
+            {teachers.length === 0
+              ? <p className="text-sm text-gray-400">{l.noTeachers}</p>
+              : (
+                <div className="flex gap-2 flex-wrap">
+                  <button
+                    onClick={() => handleSelectTeacher(null)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition
+                      ${!selectedTeacher
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600'}`}>
+                    🌐 {l.allTeachers}
                   </button>
+                  {teachers.map(t => (
+                    <button key={t.id}
+                      onClick={() => handleSelectTeacher(t)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition
+                        ${selectedTeacher?.id === t.id
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600'}`}>
+                      👤 {t.name}
+                    </button>
+                  ))}
                 </div>
-              )}
-            </div>
-          ))}
+              )
+            }
+          </div>
+
+          {/* Slots list */}
+          {enrichedSlots.length === 0
+            ? <p className="text-center text-gray-400">{l.noSlots}</p>
+            : enrichedSlots.map(slot => (
+              <div key={slot.id}
+                className={`bg-white dark:bg-gray-800 rounded-2xl shadow p-4 space-y-3 border-2 transition cursor-pointer
+                  ${selectedSlotId === slot.id ? 'border-indigo-600' : 'border-transparent'}`}
+                onClick={() => selectedSlotId === slot.id ? setSelectedSlotId(null) : setSelectedSlotId(slot.id)}>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-bold dark:text-white">📅 {slot.date} — 🕐 {slot.time}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">⏱ {slot.duration} {l.minutes}</p>
+                    {slot.teacherName && (
+                      <p className="text-xs text-indigo-500 dark:text-indigo-400 mt-0.5">
+                        👨‍🏫 {slot.teacherName}
+                      </p>
+                    )}
+                  </div>
+                  <input type="radio" checked={selectedSlotId === slot.id} onChange={() => {}}
+                    className="w-5 h-5 accent-indigo-600 cursor-pointer" />
+                </div>
+
+                {/* Package + Book */}
+                {selectedSlotId === slot.id && myPackages.length > 0 && (
+                  <div className="space-y-2 border-t pt-3" onClick={e => e.stopPropagation()}>
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">{l.selectPackage}</p>
+                    <div className="space-y-2">
+                      {myPackages.map(pkg => (
+                        <label key={pkg.id}
+                          className={`flex items-center gap-3 p-2 rounded-lg border-2 cursor-pointer transition
+                            ${selectedPackageId === pkg.id
+                              ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900'
+                              : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700'}`}>
+                          <input type="radio" name="package" checked={selectedPackageId === pkg.id}
+                            onChange={() => setSelectedPackageId(pkg.id)} className="accent-indigo-600" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm dark:text-white">{pkg.packageName}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              {pkg.remainingLessons} {l.lessonUsedFrom}
+                            </p>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                    <button onClick={() => bookSlot(slot)} disabled={loading || !selectedPackageId}
+                      className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm px-4 py-2 rounded-lg transition font-semibold">
+                      {loading ? '...' : l.book}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))
+          }
         </div>
       )}
 
@@ -247,13 +315,16 @@ export default function BookSlot({ lang }) {
         <div className="space-y-3">
           {myBookings.length === 0 && <p className="text-center text-gray-400">{l.noBookings}</p>}
           {myBookings.map(booking => (
-            <div key={booking.id}
-              className="bg-white dark:bg-gray-800 rounded-2xl shadow p-4 space-y-2">
-
+            <div key={booking.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow p-4 space-y-2">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-bold dark:text-white">📅 {booking.date} — 🕐 {booking.time}</p>
                   <p className="text-sm text-gray-500 dark:text-gray-400">⏱ {booking.duration} {l.minutes}</p>
+                  {booking.teacherName && (
+                    <p className="text-xs text-indigo-500 dark:text-indigo-400">
+                      👨‍🏫 {booking.teacherName}
+                    </p>
+                  )}
                   <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-1">📦 {booking.packageName}</p>
                 </div>
                 <span className={`text-xs px-2 py-1 rounded-full font-medium
@@ -268,7 +339,6 @@ export default function BookSlot({ lang }) {
                 </span>
               </div>
 
-              {/* Join Link */}
               {booking.status === 'confirmed' && (() => {
                 const status = getJoinLinkStatus(booking)
                 if (status === 'show' && booking.joinLink) return (
@@ -283,7 +353,6 @@ export default function BookSlot({ lang }) {
                 return null
               })()}
 
-              {/* Cancel */}
               {booking.status === 'confirmed' && (
                 <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
                   {isWithin48(booking) && (
@@ -295,7 +364,6 @@ export default function BookSlot({ lang }) {
                   </button>
                 </div>
               )}
-
             </div>
           ))}
         </div>

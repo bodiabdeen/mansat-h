@@ -11,14 +11,14 @@ const labels = {
     assignmentTitle: 'عنوان الواجب', description: 'الوصف', attach: 'إرفاق ملف',
     add: 'إضافة', noAssignments: 'لا توجد واجبات', submitted: 'تم التسليم',
     pending: 'قيد الانتظار', viewFile: 'عرض الملف', submittedFile: 'ملف الطالب',
-    noStudents: 'لا يوجد طلاب بعد'
+    noStudents: 'لا يوجد طلاب بعد', filterAll: 'الكل', filterPending: 'معلق', filterSubmitted: 'مُسلَّم'
   },
   en: {
     title: 'Assignments', addAssignment: 'Add Assignment', selectStudent: 'Select Student',
     assignmentTitle: 'Assignment Title', description: 'Description', attach: 'Attach File',
     add: 'Add', noAssignments: 'No assignments yet', submitted: 'Submitted',
     pending: 'Pending', viewFile: 'View File', submittedFile: 'Student File',
-    noStudents: 'No students yet'
+    noStudents: 'No students yet', filterAll: 'All', filterPending: 'Pending', filterSubmitted: 'Submitted'
   }
 }
 
@@ -29,24 +29,20 @@ export default function Assignments({ lang }) {
   const [form, setForm] = useState({ studentId: '', title: '', description: '' })
   const [file, setFile] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [filter, setFilter] = useState('all')
 
   const fetchData = async () => {
-    // Get students who have this teacher's package
-    const pkgSnap = await getDocs(query(
-      collection(db, 'studentPackages'), where('teacherId', '==', auth.currentUser.uid)
-    ))
-    const studentIds = pkgSnap.docs.map(d => d.data().studentId)
-    const studentList = await Promise.all(studentIds.map(async id => {
-      const u = await getDoc(doc(db, 'users', id))
-      return { id, ...u.data() }
-    }))
-    setStudents(studentList)
+    // Load ALL students in the system
+    const studentsSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'student')))
+    setStudents(studentsSnap.docs.map(d => ({ id: d.id, ...d.data() })))
 
-    // Get assignments created by this teacher
+    // Assignments created by this teacher
     const aSnap = await getDocs(query(
       collection(db, 'assignments'), where('teacherId', '==', auth.currentUser.uid)
     ))
-    setAssignments(aSnap.docs.map(d => ({ id: d.id, ...d.data() })))
+    const list = aSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+    list.sort((a, b) => b.createdAt?.toDate() - a.createdAt?.toDate())
+    setAssignments(list)
   }
 
   useEffect(() => { fetchData() }, [])
@@ -76,6 +72,12 @@ export default function Assignments({ lang }) {
 
   const getStudentName = (id) => students.find(s => s.id === id)?.name || id
 
+  const filteredAssignments = assignments.filter(a => {
+    if (filter === 'pending') return a.status === 'pending'
+    if (filter === 'submitted') return a.status === 'submitted'
+    return true
+  })
+
   return (
     <div className="max-w-xl mx-auto space-y-6">
       <h2 className="text-xl font-bold text-indigo-600 dark:text-indigo-400">📝 {l.title}</h2>
@@ -86,11 +88,13 @@ export default function Assignments({ lang }) {
 
         {students.length === 0
           ? <p className="text-sm text-gray-400">{l.noStudents}</p>
-          : <select className="input" value={form.studentId}
+          : (
+            <select className="input" value={form.studentId}
               onChange={e => setForm({ ...form, studentId: e.target.value })}>
               <option value="">{l.selectStudent}</option>
               {students.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
+          )
         }
 
         <input className="input" placeholder={l.assignmentTitle}
@@ -107,15 +111,34 @@ export default function Assignments({ lang }) {
         </div>
 
         <button onClick={addAssignment} disabled={loading}
-          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-semibold transition">
+          className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white py-2 rounded-lg font-semibold transition">
           {loading ? '...' : `+ ${l.add}`}
         </button>
       </div>
 
+      {/* Filter tabs */}
+      <div className="flex gap-2">
+        {[
+          { key: 'all', label: `📋 ${l.filterAll}` },
+          { key: 'pending', label: `⏳ ${l.filterPending}` },
+          { key: 'submitted', label: `✅ ${l.filterSubmitted}` },
+        ].map(f => (
+          <button key={f.key} onClick={() => setFilter(f.key)}
+            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition
+              ${filter === f.key
+                ? 'bg-indigo-600 text-white'
+                : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700'}`}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+
       {/* List */}
       <div className="space-y-3">
-        {assignments.length === 0 && <p className="text-center text-gray-400">{l.noAssignments}</p>}
-        {assignments.map(a => (
+        {filteredAssignments.length === 0 && (
+          <p className="text-center text-gray-400">{l.noAssignments}</p>
+        )}
+        {filteredAssignments.map(a => (
           <div key={a.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow p-4 space-y-1">
             <div className="flex items-center justify-between">
               <p className="font-bold dark:text-white">📝 {a.title}</p>

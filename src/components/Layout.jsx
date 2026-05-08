@@ -11,6 +11,7 @@ const teacherNav = [
   { key: 'slots', icon: '📅' },
   { key: 'assignments', icon: '📝' },
   { key: 'students', icon: '👨‍🎓' },
+  { key: 'settings', icon: '⚙️' },
 ]
 
 const studentNav = [
@@ -19,19 +20,20 @@ const studentNav = [
   { key: 'bookSlot', icon: '📅' },
   { key: 'assignments', icon: '📝' },
   { key: 'achievements', icon: '🏆' },
+  { key: 'settings', icon: '⚙️' },
 ]
 
 const navLabels = {
   ar: {
     dashboard: 'الرئيسية', packages: 'الباقات', slots: 'المواعيد',
     assignments: 'الواجبات', students: 'الطلاب',
-    myPackage: 'باقتي', bookSlot: 'حجز موعد', achievements: 'إنجازاتي',
+    myPackage: 'باقاتي', bookSlot: 'حجز موعد', achievements: 'إنجازاتي',
     logout: 'تسجيل الخروج', settings: 'الإعدادات'
   },
   en: {
     dashboard: 'Dashboard', packages: 'Packages', slots: 'Slots',
     assignments: 'Assignments', students: 'Students',
-    myPackage: 'My Package', bookSlot: 'Book Slot', achievements: 'Achievements',
+    myPackage: 'My Packages', bookSlot: 'Book Slot', achievements: 'Achievements',
     logout: 'Logout', settings: 'Settings'
   }
 }

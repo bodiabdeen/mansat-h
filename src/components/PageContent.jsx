@@ -8,9 +8,13 @@ import BookSlot from '../pages/student/BookSlot'
 import StudentAssignments from '../pages/student/Assignments'
 import Achievements from '../pages/student/Achievements'
 import StudentDashboard from '../pages/student/Dashboard'
+import Settings from '../pages/Settings'
 
 export default function PageContent({ page, userData, lang }) {
   const isTeacher = userData?.role === 'teacher'
+
+  // Settings is shared by both roles
+  if (page === 'settings') return <Settings lang={lang} userData={userData} />
 
   if (isTeacher) {
     if (page === 'dashboard') return <TeacherDashboard lang={lang} userData={userData} />
