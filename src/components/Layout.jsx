@@ -40,7 +40,6 @@ export default function Layout({ userData, page, setPage }) {
   const { theme, setTheme, lang, setLang } = useApp()
   const { i18n } = useTranslation()
   const [menuOpen, setMenuOpen] = useState(false)
-  const isAr = lang === 'ar'
   const labels = navLabels[lang]
   const nav = userData?.role === 'teacher' ? teacherNav : studentNav
 
@@ -51,7 +50,7 @@ export default function Layout({ userData, page, setPage }) {
   }
 
   return (
-    <div className={`min-h-screen flex flex-col ${isAr ? 'rtl' : 'ltr'}`}>
+    <div className="min-h-screen flex flex-col">
 
       {/* Top Bar */}
       <header className="bg-indigo-600 dark:bg-indigo-800 text-white px-4 py-3 flex items-center justify-between shadow">

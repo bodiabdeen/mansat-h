@@ -2,15 +2,22 @@ import { useEffect, useState } from 'react'
 import { auth, db } from './firebase'
 import { onAuthStateChanged } from 'firebase/auth'
 import { doc, getDoc } from 'firebase/firestore'
-import { AppProvider } from './context/AppContext'
+import { AppProvider, useApp } from './context/AppContext'
 import Login from './pages/Login'
 import Layout from './components/Layout'
 
 function Main() {
+  const { lang } = useApp()
   const [user, setUser] = useState(null)
   const [userData, setUserData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState('dashboard')
+
+  useEffect(() => {
+    const dir = lang === 'ar' ? 'rtl' : 'ltr'
+    document.documentElement.dir = dir
+    document.documentElement.lang = lang
+  }, [lang])
 
   useEffect(() => {
     return onAuthStateChanged(auth, async (u) => {
