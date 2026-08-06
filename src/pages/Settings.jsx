@@ -1,12 +1,14 @@
 import { useState } from 'react'
-import { auth, db } from '../firebase'
+import { auth } from '../firebase'
 import {
   sendPasswordResetEmail,
   deleteUser,
   EmailAuthProvider,
   reauthenticateWithCredential
 } from 'firebase/auth'
-import { doc, deleteDoc, collection, getDocs, query, where, writeBatch } from 'firebase/firestore'
+import { getRoles } from '../utils/roles'
+import { deleteUserData } from '../utils/deleteAccount'
+import Icon from '../components/Icon'
 
 const labels = {
   ar: {
@@ -29,6 +31,7 @@ const labels = {
     role: 'نوع الحساب',
     teacher: 'معلم',
     student: 'طالب',
+    admin: 'إدارة',
     sending: 'جارٍ الإرسال...'
   },
   en: {
@@ -51,6 +54,7 @@ const labels = {
     role: 'Account Type',
     teacher: 'Teacher',
     student: 'Student',
+    admin: 'Admin',
     sending: 'Sending...'
   }
 }
@@ -86,24 +90,7 @@ export default function Settings({ lang, userData }) {
       const credential = EmailAuthProvider.credential(user.email, deletePassword)
       await reauthenticateWithCredential(user, credential)
 
-      const uid = user.uid
-      const batch = writeBatch(db)
-
-      // Delete user doc
-      batch.delete(doc(db, 'users', uid))
-
-      // Delete user's data based on role
-      const collections = userData?.role === 'teacher'
-        ? ['packages', 'slots', 'assignments']
-        : ['studentPackages', 'bookings', 'assignments', 'rewards']
-
-      for (const col of collections) {
-        const field = userData?.role === 'teacher' ? 'teacherId' : 'studentId'
-        const snap = await getDocs(query(collection(db, col), where(field, '==', uid)))
-        snap.docs.forEach(d => batch.delete(d.ref))
-      }
-
-      await batch.commit()
+      await deleteUserData(user.uid, userData)
       await deleteUser(user)
       // Auth state change will redirect to login automatically
     } catch (e) {
@@ -118,11 +105,11 @@ export default function Settings({ lang, userData }) {
 
   return (
     <div className="max-w-lg mx-auto space-y-6">
-      <h2 className="text-xl font-bold text-indigo-600 dark:text-indigo-400">⚙️ {l.title}</h2>
+      <h2 className="text-xl font-bold text-indigo-600 dark:text-indigo-400"><Icon e="⚙️" className="w-7 h-7 inline-block align-[-0.3em]" /> {l.title}</h2>
 
       {/* Account Info */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow p-5 space-y-3">
-        <p className="font-semibold text-sm text-gray-500 dark:text-gray-400">👤 {l.accountInfo}</p>
+        <p className="font-semibold text-sm text-gray-500 dark:text-gray-400"><Icon e="👤" className="w-5 h-5 inline-block align-[-0.3em]" /> {l.accountInfo}</p>
         <div className="space-y-2">
           <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
             <span className="text-sm text-gray-500 dark:text-gray-400">{l.email}</span>
@@ -130,19 +117,29 @@ export default function Settings({ lang, userData }) {
           </div>
           <div className="flex justify-between items-center py-2">
             <span className="text-sm text-gray-500 dark:text-gray-400">{l.role}</span>
-            <span className={`text-xs px-3 py-1 rounded-full font-medium
-              ${userData?.role === 'teacher'
-                ? 'bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-300'
-                : 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300'}`}>
-              {userData?.role === 'teacher' ? `👨‍🏫 ${l.teacher}` : `👨‍🎓 ${l.student}`}
-            </span>
+            <div className="flex gap-1.5 flex-wrap justify-end">
+              {getRoles(userData).map(role => (
+                <span key={role} className={`text-xs px-3 py-1 rounded-full font-medium
+                  ${role === 'admin'
+                    ? 'bg-gold-50 text-gold-700 dark:bg-gold-700/25 dark:text-gold-400'
+                    : role === 'teacher'
+                    ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-800 dark:text-indigo-200'
+                    : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300'}`}>
+                  {role === 'admin'
+                    ? <><Icon e="👑" className="w-4 h-4 inline-block align-[-0.3em]" /> {l.admin}</>
+                    : role === 'teacher'
+                    ? <><Icon e="👨‍🏫" className="w-4 h-4 inline-block align-[-0.3em]" /> {l.teacher}</>
+                    : <><Icon e="👨‍🎓" className="w-4 h-4 inline-block align-[-0.3em]" /> {l.student}</>}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
       {/* Reset Password */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow p-5 space-y-3">
-        <p className="font-semibold text-sm text-gray-500 dark:text-gray-400">🔐 {l.passwordSection}</p>
+        <p className="font-semibold text-sm text-gray-500 dark:text-gray-400"><Icon e="🔐" className="w-5 h-5 inline-block align-[-0.3em]" /> {l.passwordSection}</p>
         {resetSent
           ? <p className="text-green-600 dark:text-green-400 text-sm">{l.resetSent}</p>
           : (
@@ -150,7 +147,9 @@ export default function Settings({ lang, userData }) {
               onClick={handleResetPassword}
               disabled={sendingReset}
               className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white py-2.5 rounded-lg font-semibold transition">
-              {sendingReset ? `⏳ ${l.sending}` : `📧 ${l.resetPassword}`}
+              {sendingReset
+                ? <><Icon e="⏳" className="w-5 h-5 inline-block align-[-0.3em]" /> {l.sending}</>
+                : <><Icon e="📧" className="w-5 h-5 inline-block align-[-0.3em]" /> {l.resetPassword}</>}
             </button>
           )
         }
@@ -158,7 +157,7 @@ export default function Settings({ lang, userData }) {
 
       {/* Danger Zone */}
       <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-2xl p-5 space-y-4">
-        <p className="font-semibold text-red-600 dark:text-red-400">⚠️ {l.dangerZone}</p>
+        <p className="font-semibold text-red-600 dark:text-red-400"><Icon e="⚠️" className="w-5 h-5 inline-block align-[-0.3em]" /> {l.dangerZone}</p>
         <p className="text-sm text-red-500 dark:text-red-400">{l.deleteWarning}</p>
 
         {!showDeleteConfirm
@@ -166,7 +165,7 @@ export default function Settings({ lang, userData }) {
             <button
               onClick={() => setShowDeleteConfirm(true)}
               className="w-full bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg font-semibold transition">
-              🗑️ {l.deleteAccount}
+              <Icon e="🗑️" className="w-5 h-5 inline-block align-[-0.3em]" /> {l.deleteAccount}
             </button>
           )
           : (
@@ -191,7 +190,9 @@ export default function Settings({ lang, userData }) {
                   onClick={handleDeleteAccount}
                   disabled={deleting || !deletePassword}
                   className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white py-2 rounded-lg font-semibold transition">
-                  {deleting ? `⏳ ${l.deleting}` : `🗑️ ${l.confirmBtn}`}
+                  {deleting
+                    ? <><Icon e="⏳" className="w-5 h-5 inline-block align-[-0.3em]" /> {l.deleting}</>
+                    : <><Icon e="🗑️" className="w-5 h-5 inline-block align-[-0.3em]" /> {l.confirmBtn}</>}
                 </button>
               </div>
             </div>

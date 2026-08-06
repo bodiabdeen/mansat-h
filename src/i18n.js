@@ -4,7 +4,8 @@ import { initReactI18next } from 'react-i18next'
 const resources = {
   ar: {
     translation: {
-      appName: 'منصة H',
+      appName: 'بروف',
+      appTagline: 'منصة تعليمية ذكية تُلهم التميز',
       login: 'تسجيل الدخول',
       register: 'إنشاء حساب',
       email: 'البريد الإلكتروني',
@@ -13,14 +14,21 @@ const resources = {
       role: 'نوع الحساب',
       teacher: 'معلم',
       student: 'طالب',
+      admin: 'إدارة',
       submit: 'دخول',
       noAccount: 'ليس لديك حساب؟',
       hasAccount: 'لديك حساب بالفعل؟',
+      forgotPassword: 'نسيت كلمة المرور؟',
+      sendResetLink: 'إرسال رابط إعادة التعيين',
+      resetSent: 'تم إرسال رابط إعادة التعيين إلى بريدك الإلكتروني ✅',
+      backToLogin: 'العودة لتسجيل الدخول',
+      backToHome: 'العودة للصفحة الرئيسية',
     }
   },
   en: {
     translation: {
-      appName: 'Mansat H',
+      appName: 'PROF',
+      appTagline: 'Intelligent EdTech Platform Inspiring Excellence',
       login: 'Login',
       register: 'Register',
       email: 'Email',
@@ -29,9 +37,15 @@ const resources = {
       role: 'Account Type',
       teacher: 'Teacher',
       student: 'Student',
+      admin: 'Admin',
       submit: 'Login',
       noAccount: "Don't have an account?",
       hasAccount: 'Already have an account?',
+      forgotPassword: 'Forgot password?',
+      sendResetLink: 'Send Reset Link',
+      resetSent: 'Reset link sent to your email ✅',
+      backToLogin: 'Back to Login',
+      backToHome: 'Back to Home',
     }
   }
 }

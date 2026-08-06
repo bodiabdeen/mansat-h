@@ -1,0 +1,220 @@
+rules_version = '2';
+
+// NOTE: this is a new addition — the project previously had no committed
+// Firestore rules at all. Review and test (Firebase console Rules Playground
+// or the emulator) before deploying; do not `firebase deploy` blind.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data;
+    }
+
+    function myRoles() {
+      let u = userDoc(request.auth.uid);
+      return 'roles' in u ? u.roles : ('role' in u ? [u.role] : []);
+    }
+
+    function isApproved() {
+      return isSignedIn() && userDoc(request.auth.uid).status == 'approved';
+    }
+
+    function hasRole(r) {
+      return isApproved() && r in myRoles();
+    }
+
+    function isAdmin() {
+      return hasRole('admin');
+    }
+
+    function isTeacher() {
+      return hasRole('teacher');
+    }
+
+    function isStudent() {
+      return hasRole('student');
+    }
+
+    function isTeacherUid(uid) {
+      let u = userDoc(uid);
+      let roles = 'roles' in u ? u.roles : ('role' in u ? [u.role] : []);
+      return 'teacher' in roles;
+    }
+
+    function onlyFieldsChanged(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
+    // A lightweight, admin-maintained flag proving a teacher/student pair has
+    // an approved package together — the only reliable per-document lookup
+    // path we have (studentPackages is keyed by student+package, not by pair),
+    // so it's what messages.create checks to enforce "only your own contacts".
+    function isConnected(teacherId, studentId) {
+      return exists(/databases/$(database)/documents/connections/$(teacherId + '_' + studentId));
+    }
+
+    // --- users ---
+    match /users/{uid} {
+      allow create: if isSignedIn() && request.auth.uid == uid
+        && request.resource.data.uid == uid
+        && request.resource.data.status == 'pending'
+        // admin is never self-registerable — only an existing admin can grant it,
+        // via the Manage Roles panel (which goes through the isAdmin() update branch).
+        && request.resource.data.role in ['student', 'teacher']
+        && request.resource.data.roles == [request.resource.data.role];
+
+      allow read: if isSignedIn() && (request.auth.uid == uid || isApproved());
+
+      // Only an admin can change role/roles/status on any account (including
+      // their own); a non-admin can update other profile fields on their own doc.
+      allow update: if isAdmin()
+        || (isSignedIn() && request.auth.uid == uid
+            && request.resource.data.role == resource.data.role
+            && request.resource.data.status == resource.data.status
+            && request.resource.data.get('roles', []) == resource.data.get('roles', []));
+
+      allow delete: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
+    }
+
+    // --- courses ---
+    // Public read: these are marketing content, shown on the pre-login landing page.
+    match /courses/{id} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // --- packages (admin-owned templates) ---
+    // Public read: same reasoning as courses — this is what's being marketed.
+    match /packages/{id} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // --- teacherProfiles (curated public marketing profile, separate from the
+    // private `users` doc so email/uid/status never get exposed) ---
+    match /teacherProfiles/{uid} {
+      allow read: if true;
+      allow create, update: if isAdmin() || (isSignedIn() && request.auth.uid == uid && isTeacher());
+      allow delete: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
+    }
+
+    // --- studentPackages (purchase requests / active packages) ---
+    match /studentPackages/{id} {
+      allow read: if isAdmin()
+        || (isSignedIn() && (resource.data.studentId == request.auth.uid || resource.data.teacherId == request.auth.uid));
+
+      // A teacher can request a package on a student's behalf, or a student
+      // can self-request one after picking a teacher (must be a real teacher account).
+      allow create: if request.resource.data.status == 'pending_approval'
+        && request.resource.data.remainingLessons == 0
+        && (
+          (isTeacher() && request.resource.data.teacherId == request.auth.uid)
+          || (isStudent() && request.resource.data.studentId == request.auth.uid
+              && isTeacherUid(request.resource.data.teacherId))
+        );
+
+      allow update: if isAdmin()
+        || (isStudent() && resource.data.studentId == request.auth.uid
+            && (
+              // status is missing on packages created before this pending-approval
+              // workflow existed — treat those as active too, same as the client does.
+              ((!('status' in resource.data) || resource.data.status == 'active')
+                && onlyFieldsChanged(['remainingLessons']))
+              // Resubmitting a rejected request reuses the same doc id (studentId_packageId),
+              // which Firestore treats as an update, not a create — so that transition has
+              // to be explicitly allowed here too, mirroring the create rule's checks.
+              || (resource.data.status == 'rejected'
+                  && request.resource.data.studentId == request.auth.uid
+                  && request.resource.data.status == 'pending_approval'
+                  && request.resource.data.remainingLessons == 0
+                  && isTeacherUid(request.resource.data.teacherId))
+            ));
+
+      allow delete: if isAdmin()
+        || (isTeacher() && resource.data.teacherId == request.auth.uid && resource.data.status == 'pending_approval')
+        || (isStudent() && resource.data.studentId == request.auth.uid);
+    }
+
+    // --- slots ---
+    match /slots/{id} {
+      allow read: if isApproved();
+      // Admin can add availability on behalf of any teacher, so they can help
+      // manage a teacher's schedule; a teacher can only add their own.
+      allow create: if isAdmin() || (isTeacher() && request.resource.data.teacherId == request.auth.uid);
+      allow update: if isAdmin()
+        || (isTeacher() && resource.data.teacherId == request.auth.uid)
+        || (isStudent() && onlyFieldsChanged(['booked', 'studentId']));
+      allow delete: if isAdmin() || (isTeacher() && resource.data.teacherId == request.auth.uid);
+    }
+
+    // --- bookings ---
+    match /bookings/{id} {
+      allow read: if isAdmin()
+        || (isSignedIn() && (resource.data.studentId == request.auth.uid || resource.data.teacherId == request.auth.uid));
+      allow create: if isStudent() && request.resource.data.studentId == request.auth.uid;
+      allow update: if isAdmin()
+        || (isStudent() && resource.data.studentId == request.auth.uid && onlyFieldsChanged(['status']));
+      allow delete: if isAdmin() || (isStudent() && resource.data.studentId == request.auth.uid);
+    }
+
+    // --- assignments ---
+    match /assignments/{id} {
+      allow read: if isAdmin()
+        || (isSignedIn() && (resource.data.studentId == request.auth.uid || resource.data.teacherId == request.auth.uid));
+      allow create: if isTeacher() && request.resource.data.teacherId == request.auth.uid;
+      allow update: if isAdmin()
+        || (isTeacher() && resource.data.teacherId == request.auth.uid)
+        || (isStudent() && resource.data.studentId == request.auth.uid
+            && onlyFieldsChanged(['status', 'submittedUrl', 'submittedAt']));
+      allow delete: if isAdmin()
+        || (isTeacher() && resource.data.teacherId == request.auth.uid)
+        || (isStudent() && resource.data.studentId == request.auth.uid);
+    }
+
+    // --- rewards ---
+    match /rewards/{id} {
+      allow read: if isAdmin()
+        || (isSignedIn() && (resource.data.studentId == request.auth.uid || resource.data.teacherId == request.auth.uid));
+      allow create: if isTeacher() && request.resource.data.teacherId == request.auth.uid;
+      allow delete: if isAdmin()
+        || (isTeacher() && resource.data.teacherId == request.auth.uid)
+        || (isStudent() && resource.data.studentId == request.auth.uid);
+    }
+
+    // --- connections (teacher/student pairs with an approved package together) ---
+    // Only ever written by an admin, as a side effect of approving a package request.
+    match /connections/{id} {
+      allow read: if isSignedIn() && (isAdmin() || resource.data.teacherId == request.auth.uid || resource.data.studentId == request.auth.uid);
+      allow create, update: if isAdmin();
+    }
+
+    // --- messages (teacher <-> student chat) ---
+    match /messages/{id} {
+      // `participants` (not senderId/recipientId) is what read queries filter
+      // on, since Firestore must be able to verify the rule from the query's
+      // own filters alone — an OR over two different fields can't be proven
+      // safe from a single equality filter like threadId, but array-contains
+      // against the requester's own uid can.
+      allow read: if isAdmin()
+        || (isSignedIn() && request.auth.uid in resource.data.participants);
+      allow create: if isSignedIn()
+        && request.resource.data.senderId == request.auth.uid
+        && request.resource.data.participants == [request.resource.data.teacherId, request.resource.data.studentId]
+        && (
+          (isTeacher() && request.resource.data.teacherId == request.auth.uid && request.resource.data.recipientId == request.resource.data.studentId)
+          || (isStudent() && request.resource.data.studentId == request.auth.uid && request.resource.data.recipientId == request.resource.data.teacherId)
+        )
+        && isConnected(request.resource.data.teacherId, request.resource.data.studentId);
+      // Only the recipient can mark a message read, and only that one field.
+      allow update: if isAdmin()
+        || (isSignedIn() && resource.data.recipientId == request.auth.uid && onlyFieldsChanged(['read']));
+      // Admin-only moderation: delete an individual message or a whole conversation.
+      allow delete: if isAdmin();
+    }
+  }
+}

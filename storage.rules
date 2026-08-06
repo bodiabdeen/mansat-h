@@ -1,0 +1,47 @@
+rules_version = '2';
+
+// Mirrors the admin check used in firestore.rules. Storage rules can call
+// firestore.get() to check the same users/{uid} doc.
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      let u = firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+      let roles = 'roles' in u ? u.roles : ('role' in u ? [u.role] : []);
+      return isSignedIn() && u.status == 'approved' && 'admin' in roles;
+    }
+
+    function isTeacher() {
+      let u = firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+      let roles = 'roles' in u ? u.roles : ('role' in u ? [u.role] : []);
+      return isSignedIn() && u.status == 'approved' && 'teacher' in roles;
+    }
+
+    // Course media (photos/intro videos) — public, shown on the pre-login
+    // landing page; only admins can upload/replace/remove it.
+    match /courses/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Teacher marketing photos — public read, writable by the teacher
+    // themselves or an admin on their behalf.
+    match /teacherProfiles/{uid}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAdmin() || (isSignedIn() && request.auth.uid == uid && isTeacher());
+    }
+
+    // Homework attachments (teacher-assigned files, student submissions) —
+    // unchanged from how they already worked before this file existed.
+    match /assignments/{allPaths=**} {
+      allow read, write: if isSignedIn();
+    }
+    match /homework/{allPaths=**} {
+      allow read, write: if isSignedIn();
+    }
+  }
+}

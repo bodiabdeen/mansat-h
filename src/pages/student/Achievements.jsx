@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { db, auth } from '../../firebase'
 import { collection, getDocs, query, where } from 'firebase/firestore'
+import Icon from '../../components/Icon'
 
 const labels = {
   ar: {
@@ -35,7 +36,7 @@ export default function Achievements({ lang }) {
 
   return (
     <div className="max-w-xl mx-auto space-y-6">
-      <h2 className="text-xl font-bold text-indigo-600 dark:text-indigo-400">🏆 {l.title}</h2>
+      <h2 className="text-xl font-bold text-indigo-600 dark:text-indigo-400"><Icon e="🏆" className="w-7 h-7 inline-block align-[-0.3em]" /> {l.title}</h2>
 
       {rewards.length === 0
         ? <p className="text-center text-gray-400">{l.noRewards}</p>
@@ -49,7 +50,7 @@ export default function Achievements({ lang }) {
           {/* Badges */}
           {badges.length > 0 && (
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow p-4">
-              <p className="font-semibold text-sm text-gray-500 dark:text-gray-400 mb-3">🏅 {l.badges}</p>
+              <p className="font-semibold text-sm text-gray-500 dark:text-gray-400 mb-3"><Icon e="🏅" className="w-5 h-5 inline-block align-[-0.3em]" /> {l.badges}</p>
               <div className="flex gap-2 flex-wrap">
                 {badges.map(r => (
                   <div key={r.id} className="text-center">
@@ -64,7 +65,7 @@ export default function Achievements({ lang }) {
           {/* Grades */}
           {grades.length > 0 && (
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow p-4 space-y-2">
-              <p className="font-semibold text-sm text-gray-500 dark:text-gray-400 mb-1">📊 {l.grades}</p>
+              <p className="font-semibold text-sm text-gray-500 dark:text-gray-400 mb-1"><Icon e="📊" className="w-5 h-5 inline-block align-[-0.3em]" /> {l.grades}</p>
               {grades.map(r => (
                 <div key={r.id} className="flex items-center justify-between py-1 border-b border-gray-100 dark:border-gray-700 last:border-0">
                   <span className="font-bold text-lg dark:text-white">{r.grade}</span>

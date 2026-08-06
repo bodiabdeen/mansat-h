@@ -1,19 +1,24 @@
 import { useEffect, useState } from 'react'
 import { db, auth } from '../../firebase'
 import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore'
+import Icon from '../../components/Icon'
 
 const labels = {
   ar: {
     title: 'باقاتي', noPackages: 'لا توجد باقات مُعيَّنة لك بعد',
     remaining: 'متبقي', used: 'مستخدم', total: 'الإجمالي',
     lessons: 'حصة', teacher: 'المعلم', active: 'نشطة', finished: 'منتهية',
-    progress: 'التقدم'
+    progress: 'التقدم', pending: 'بانتظار الموافقة',
+    pendingNote: 'بانتظار موافقة الإدارة على الدفع',
+    unpaid: 'لم يُدفع', partial: 'دفع جزئي', paid: 'دُفع بالكامل'
   },
   en: {
     title: 'My Packages', noPackages: 'No packages assigned to you yet',
     remaining: 'Remaining', used: 'Used', total: 'Total',
     lessons: 'lessons', teacher: 'Teacher', active: 'Active', finished: 'Finished',
-    progress: 'Progress'
+    progress: 'Progress', pending: 'Awaiting Approval',
+    pendingNote: 'Awaiting admin payment approval',
+    unpaid: 'Unpaid', partial: 'Partially Paid', paid: 'Fully Paid'
   }
 }
 
@@ -50,28 +55,45 @@ export default function MyPackage({ lang }) {
 
   if (loading) return (
     <div className="flex justify-center py-12">
-      <div className="text-3xl animate-spin">📦</div>
+      <div className="animate-spin"><Icon e="📦" className="w-10 h-10 inline-block" /></div>
     </div>
   )
 
-  const activePackages = packages.filter(p => p.remainingLessons > 0)
-  const finishedPackages = packages.filter(p => p.remainingLessons === 0)
+  const pendingPackages = packages.filter(p => p.status === 'pending_approval')
+  const activePackages = packages.filter(p => p.status !== 'pending_approval' && p.remainingLessons > 0)
+  const finishedPackages = packages.filter(p => p.status !== 'pending_approval' && p.remainingLessons === 0)
 
   return (
     <div className="max-w-xl mx-auto space-y-6">
-      <h2 className="text-xl font-bold text-indigo-600 dark:text-indigo-400">📦 {l.title}</h2>
+      <h2 className="text-xl font-bold text-indigo-600 dark:text-indigo-400"><Icon e="📦" className="w-7 h-7 inline-block align-[-0.3em]" /> {l.title}</h2>
 
       {packages.length === 0 && (
         <div className="text-center py-12 text-gray-400">
-          <div className="text-5xl mb-3">📦</div>
+          <div className="mb-3"><Icon e="📦" className="w-14 h-14 inline-block" /></div>
           <p>{l.noPackages}</p>
+        </div>
+      )}
+
+      {/* Pending approval */}
+      {pendingPackages.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-sm font-semibold text-yellow-600 dark:text-yellow-400"><Icon e="⏳" className="w-5 h-5 inline-block align-[-0.3em]" /> {l.pending}</p>
+          {pendingPackages.map(pkg => (
+            <div key={pkg.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow p-5 space-y-1">
+              <p className="font-bold text-gray-800 dark:text-white text-lg">{pkg.packageName}</p>
+              {pkg.teacherName && (
+                <p className="text-sm text-indigo-500 dark:text-indigo-400"><Icon e="👨‍🏫" className="w-5 h-5 inline-block align-[-0.3em]" /> {pkg.teacherName}</p>
+              )}
+              <p className="text-xs text-yellow-600 dark:text-yellow-400">{l.pendingNote}</p>
+            </div>
+          ))}
         </div>
       )}
 
       {/* Active packages */}
       {activePackages.length > 0 && (
         <div className="space-y-3">
-          <p className="text-sm font-semibold text-green-600 dark:text-green-400">✅ {l.active}</p>
+          <p className="text-sm font-semibold text-green-600 dark:text-green-400"><Icon e="✅" className="w-5 h-5 inline-block align-[-0.3em]" /> {l.active}</p>
           {activePackages.map(pkg => (
             <PackageCard key={pkg.id} pkg={pkg} l={l} />
           ))}
@@ -81,7 +103,7 @@ export default function MyPackage({ lang }) {
       {/* Finished packages */}
       {finishedPackages.length > 0 && (
         <div className="space-y-3">
-          <p className="text-sm font-semibold text-gray-400">🏁 {l.finished}</p>
+          <p className="text-sm font-semibold text-gray-400"><Icon e="🏁" className="w-5 h-5 inline-block align-[-0.3em]" /> {l.finished}</p>
           {finishedPackages.map(pkg => (
             <PackageCard key={pkg.id} pkg={pkg} l={l} finished />
           ))}
@@ -104,8 +126,18 @@ function PackageCard({ pkg, l, finished }) {
           <p className="font-bold text-gray-800 dark:text-white text-lg">{pkg.packageName}</p>
           {pkg.teacherName && (
             <p className="text-sm text-indigo-500 dark:text-indigo-400 mt-0.5">
-              👨‍🏫 {pkg.teacherName}
+              <Icon e="👨‍🏫" className="w-5 h-5 inline-block align-[-0.3em]" /> {pkg.teacherName}
             </p>
+          )}
+          {pkg.paymentStatus && (
+            <span className={`inline-block mt-1 text-xs px-2 py-0.5 rounded-full font-medium
+              ${pkg.paymentStatus === 'paid'
+                ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300'
+                : pkg.paymentStatus === 'partial'
+                ? 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900 dark:text-yellow-300'
+                : 'bg-red-100 text-red-500 dark:bg-red-900 dark:text-red-300'}`}>
+              {l[pkg.paymentStatus] || pkg.paymentStatus}
+            </span>
           )}
         </div>
         <div className="text-right">
