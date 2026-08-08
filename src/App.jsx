@@ -9,6 +9,7 @@ import Layout from './components/Layout'
 import PendingApproval from './pages/PendingApproval'
 import { getRoles } from './utils/roles'
 import BrandMark from './components/BrandMark'
+import InstallPrompt from './components/InstallPrompt'
 
 const ROLE_PRIORITY = ['admin', 'teacher', 'student']
 
@@ -102,6 +103,7 @@ export default function App() {
   return (
     <AppProvider>
       <Main />
+      <InstallPrompt />
     </AppProvider>
   )
 }

@@ -83,12 +83,6 @@ export default function StudentDashboard({ lang, userData, setPage }) {
         </p>
       </div>
 
-      {/* Courses & Packages showcase */}
-      <div className="space-y-3">
-        <p className="font-semibold text-sm text-gray-500 dark:text-gray-400">{l.catalogTitle}</p>
-        <CourseCatalog lang={lang} />
-      </div>
-
       {/* My Packages */}
       <div className="space-y-3">
         <p className="font-semibold text-sm text-gray-500 dark:text-gray-400"><Icon e="📦" className="w-5 h-5 inline-block align-[-0.3em]" /> {l.myPackages}</p>
@@ -173,6 +167,12 @@ export default function StudentDashboard({ lang, userData, setPage }) {
           </div>
         </div>
       )}
+
+      {/* Courses & Packages showcase */}
+      <div className="space-y-3">
+        <p className="font-semibold text-sm text-gray-500 dark:text-gray-400">{l.catalogTitle}</p>
+        <CourseCatalog lang={lang} />
+      </div>
     </div>
   )
 }

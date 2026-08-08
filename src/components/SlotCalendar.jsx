@@ -176,7 +176,7 @@ const stateClasses = {
   selected: 'bg-indigo-600 text-white border-indigo-600'
 }
 
-export default function SlotCalendar({ lang, mode, teacherId, slots, onSlotsChanged, selectedSlotId, onSelectSlot }) {
+export default function SlotCalendar({ lang, mode, teacherId, slots, onSlotsChanged, selectedSlotIds = [], onSelectSlot }) {
   const l = labels[lang]
   const manage = mode === 'manage'
   const [view, setView] = useState('week')
@@ -245,10 +245,10 @@ export default function SlotCalendar({ lang, mode, teacherId, slots, onSlotsChan
   // ---------- shared "slot pill" used by month agenda + day strip ----------
   function SlotRow({ slot }) {
     const state = slotState(slot)
-    const isSel = selectedSlotId === slot.id
+    const isSel = selectedSlotIds.includes(slot.id)
     const cls = isSel ? stateClasses.selected : stateClasses[state]
     return (
-      <div className={`rounded-xl border p-3 flex items-center justify-between gap-3 ${cls} ${!manage && state === 'available' ? 'cursor-pointer hover:opacity-80' : ''}`}
+      <div className={`rounded-xl border p-3 flex items-center justify-between gap-3 ${cls} ${!manage && state === 'available' && onSelectSlot ? 'cursor-pointer hover:opacity-80' : ''}`}
         onClick={() => clickSlot(slot)}>
         <div>
           <p className="font-semibold text-sm">{fmtTime(timeToMin(slot.time))}</p>
@@ -332,14 +332,14 @@ export default function SlotCalendar({ lang, mode, teacherId, slots, onSlotsChan
                 <div key={i} className="relative border-s border-gray-200 dark:border-gray-700" style={{ height: '600px' }}>
                   {(byDate[ds] || []).map(slot => {
                     const state = slotState(slot)
-                    const isSel = selectedSlotId === slot.id
+                    const isSel = selectedSlotIds.includes(slot.id)
                     const top = ((timeToMin(slot.time) - GRID_START) / GRID_TOTAL) * 100
                     const height = Math.max((slot.duration / GRID_TOTAL) * 100, 5)
                     return (
                       <div key={slot.id}
                         className={`absolute left-0.5 right-0.5 rounded-lg border px-1.5 py-1 text-[10.5px] leading-tight overflow-hidden
                           ${isSel ? stateClasses.selected : stateClasses[state]}
-                          ${!manage && state === 'available' ? 'cursor-pointer hover:opacity-80' : ''}`}
+                          ${!manage && state === 'available' && onSelectSlot ? 'cursor-pointer hover:opacity-80' : ''}`}
                         style={{ top: `${top}%`, height: `${height}%` }}
                         onClick={() => clickSlot(slot)}
                         title={fmtTime(timeToMin(slot.time)) + ' · ' + slotLabel(slot, state)}>

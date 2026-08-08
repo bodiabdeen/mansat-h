@@ -10,7 +10,8 @@ const labels = {
     lessons: 'حصة', teacher: 'المعلم', active: 'نشطة', finished: 'منتهية',
     progress: 'التقدم', pending: 'بانتظار الموافقة',
     pendingNote: 'بانتظار موافقة الإدارة على الدفع',
-    unpaid: 'لم يُدفع', partial: 'دفع جزئي', paid: 'دُفع بالكامل'
+    unpaid: 'لم يُدفع', partial: 'دفع جزئي', paid: 'دُفع بالكامل',
+    tapToBook: 'اضغط لحجز موعد ←'
   },
   en: {
     title: 'My Packages', noPackages: 'No packages assigned to you yet',
@@ -18,11 +19,12 @@ const labels = {
     lessons: 'lessons', teacher: 'Teacher', active: 'Active', finished: 'Finished',
     progress: 'Progress', pending: 'Awaiting Approval',
     pendingNote: 'Awaiting admin payment approval',
-    unpaid: 'Unpaid', partial: 'Partially Paid', paid: 'Fully Paid'
+    unpaid: 'Unpaid', partial: 'Partially Paid', paid: 'Fully Paid',
+    tapToBook: 'Tap to book a slot →'
   }
 }
 
-export default function MyPackage({ lang }) {
+export default function MyPackage({ lang, setPage }) {
   const l = labels[lang]
   const [packages, setPackages] = useState([])
   const [loading, setLoading] = useState(true)
@@ -95,7 +97,10 @@ export default function MyPackage({ lang }) {
         <div className="space-y-3">
           <p className="text-sm font-semibold text-green-600 dark:text-green-400"><Icon e="✅" className="w-5 h-5 inline-block align-[-0.3em]" /> {l.active}</p>
           {activePackages.map(pkg => (
-            <PackageCard key={pkg.id} pkg={pkg} l={l} />
+            <PackageCard key={pkg.id} pkg={pkg} l={l} onClick={() => {
+              localStorage.setItem('bookSlotInitialTab', 'available')
+              setPage?.('bookSlot')
+            }} />
           ))}
         </div>
       )}
@@ -113,14 +118,15 @@ export default function MyPackage({ lang }) {
   )
 }
 
-function PackageCard({ pkg, l, finished }) {
+function PackageCard({ pkg, l, finished, onClick }) {
   const usedPercent = pkg.totalLessons
     ? ((pkg.totalLessons - pkg.remainingLessons) / pkg.totalLessons) * 100
     : 0
 
   return (
-    <div className={`bg-white dark:bg-gray-800 rounded-2xl shadow p-5 space-y-3
-      ${finished ? 'opacity-60' : ''}`}>
+    <div onClick={onClick}
+      className={`bg-white dark:bg-gray-800 rounded-2xl shadow p-5 space-y-3
+      ${finished ? 'opacity-60' : ''} ${onClick ? 'cursor-pointer hover:shadow-md transition' : ''}`}>
       <div className="flex items-start justify-between">
         <div>
           <p className="font-bold text-gray-800 dark:text-white text-lg">{pkg.packageName}</p>
@@ -159,6 +165,10 @@ function PackageCard({ pkg, l, finished }) {
           />
         </div>
       </div>
+
+      {onClick && (
+        <p className="text-xs text-indigo-500 dark:text-indigo-400 font-medium text-end">{l.tapToBook}</p>
+      )}
     </div>
   )
 }

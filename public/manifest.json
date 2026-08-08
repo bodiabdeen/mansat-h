@@ -1,0 +1,14 @@
+{
+  "name": "بروف | PROF",
+  "short_name": "PROF",
+  "description": "تعلّم مع أفضل المعلمين، في الوقت الذي يناسبك",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0C1B2E",
+  "theme_color": "#0C1B2E",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/logo-icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

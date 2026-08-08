@@ -1,34 +1,39 @@
 import { useEffect, useState } from 'react'
 import { db, auth } from '../../firebase'
 import {
-  collection, getDocs, doc, getDoc, updateDoc, addDoc,
+  collection, getDocs, doc, getDoc, updateDoc, writeBatch,
   query, where
 } from 'firebase/firestore'
 import SlotCalendar from '../../components/SlotCalendar'
+import StatTile from '../../components/StatTile'
 import Icon from '../../components/Icon'
 
 const labels = {
   ar: {
-    title: 'حجز موعد', myBookings: 'حجوزاتي', available: 'المواعيد المتاحة',
+    title: 'حجوزاتي', myBookings: 'حجوزاتي', available: 'المواعيد المتاحة',
     book: 'احجز', cancel: 'إلغاء',
     noBookings: 'لا توجد حجوزات', minutes: 'دقيقة',
     cancelWarning: 'تنبيه: الإلغاء خلال 48 ساعة سيُحتسب كحصة مستهلكة',
     missed: 'غياب (محتسب)', confirmed: 'مؤكد', noPackage: 'يجب تفعيل باقة أولاً',
     selectPackage: 'اختر الباقة المراد استخدام حصة منها', lessonUsedFrom: 'حصص متبقية',
     joinNow: 'انضم للحصة الآن', linkSoon: 'الرابط سيظهر قبل 15 دقيقة',
-    teacher: 'المعلم', selectTeacher: 'اختر معلماً', allTeachers: 'كل معلميّ',
-    noTeachers: 'لا يوجد معلم معتمد على باقاتك بعد'
+    teacher: 'المعلم', selectTeacher: 'اختر معلماً',
+    noTeachers: 'لا يوجد معلم معتمد على باقاتك بعد',
+    selectedSlots: 'المواعيد المختارة', notEnoughLessons: 'الباقة المختارة لا تحتوي على عدد كافٍ من الحصص المتبقية',
+    completed: 'مكتملة', cancelledStat: 'ملغاة (مستردة)', upcomingStat: 'قادمة'
   },
   en: {
-    title: 'Book a Slot', myBookings: 'My Bookings', available: 'Available Slots',
+    title: 'My Bookings', myBookings: 'My Bookings', available: 'Available Slots',
     book: 'Book', cancel: 'Cancel',
     noBookings: 'No bookings yet', minutes: 'min',
     cancelWarning: 'Warning: Cancelling within 48 hours counts as a used lesson',
     missed: 'Missed (counted)', confirmed: 'Confirmed', noPackage: 'Please activate a package first',
     selectPackage: 'Select which package to use', lessonUsedFrom: 'lessons left',
     joinNow: 'Join Lesson Now', linkSoon: 'Link appears 15 min before',
-    teacher: 'Teacher', selectTeacher: 'Select a Teacher', allTeachers: 'All My Teachers',
-    noTeachers: 'No approved teacher for your packages yet'
+    teacher: 'Teacher', selectTeacher: 'Select a Teacher',
+    noTeachers: 'No approved teacher for your packages yet',
+    selectedSlots: 'Selected Slots', notEnoughLessons: "Selected package doesn't have enough lessons remaining",
+    completed: 'Completed', cancelledStat: 'Cancelled (refunded)', upcomingStat: 'Upcoming'
   }
 }
 
@@ -40,8 +45,12 @@ export default function BookSlot({ lang }) {
   const [myBookings, setMyBookings] = useState([])
   const [myPackages, setMyPackages] = useState([])
   const [loading, setLoading] = useState(false)
-  const [tab, setTab] = useState('available')
-  const [selectedSlotId, setSelectedSlotId] = useState(null)
+  const [tab, setTab] = useState(() => {
+    const initialTab = localStorage.getItem('bookSlotInitialTab')
+    if (initialTab) localStorage.removeItem('bookSlotInitialTab')
+    return initialTab || 'myBookings'
+  })
+  const [selectedSlotIds, setSelectedSlotIds] = useState([])
   const [selectedPackageId, setSelectedPackageId] = useState(null)
 
   const fetchPackages = async () => {
@@ -116,7 +125,9 @@ export default function BookSlot({ lang }) {
     const init = async () => {
       const activePackages = await fetchPackages()
       const allowedTeachers = await fetchTeachers(activePackages)
-      await fetchSlots(null, allowedTeachers)
+      const defaultTeacher = allowedTeachers[0] || null
+      setSelectedTeacher(defaultTeacher)
+      await fetchSlots(defaultTeacher ? defaultTeacher.id : null, allowedTeachers)
       await fetchMyBookings()
     }
     init()
@@ -124,40 +135,48 @@ export default function BookSlot({ lang }) {
 
   const handleSelectTeacher = (teacher) => {
     setSelectedTeacher(teacher)
-    setSelectedSlotId(null)
+    setSelectedSlotIds([])
     setSelectedPackageId(null)
     fetchSlots(teacher ? teacher.id : null, teachers)
   }
 
-  const bookSlot = async (slot) => {
+  const toggleSlot = (slot) => {
+    setSelectedSlotIds(prev =>
+      prev.includes(slot.id) ? prev.filter(id => id !== slot.id) : [...prev, slot.id])
+  }
+
+  const bookSelectedSlots = async (slotsToBook) => {
     if (myPackages.length === 0) return alert(l.noPackage)
     if (!selectedPackageId) return alert(l.selectPackage)
     const selectedPkg = myPackages.find(p => p.id === selectedPackageId)
-    if (!selectedPkg || selectedPkg.remainingLessons <= 0) return alert('No lessons remaining')
+    if (!selectedPkg) return
+    if (selectedPkg.remainingLessons < slotsToBook.length) return alert(l.notEnoughLessons)
 
     setLoading(true)
     try {
-      await updateDoc(doc(db, 'slots', slot.id), {
-        booked: true, studentId: auth.currentUser.uid
+      const batch = writeBatch(db)
+      slotsToBook.forEach(slot => {
+        batch.update(doc(db, 'slots', slot.id), { booked: true, studentId: auth.currentUser.uid })
+        batch.set(doc(collection(db, 'bookings')), {
+          slotId: slot.id,
+          studentId: auth.currentUser.uid,
+          teacherId: slot.teacherId,
+          studentPackageId: selectedPkg.id,
+          packageId: selectedPkg.packageId,
+          packageName: selectedPkg.packageName,
+          date: slot.date,
+          time: slot.time,
+          duration: slot.duration,
+          status: 'confirmed',
+          joinLink: slot.joinLink || '',
+          createdAt: new Date()
+        })
       })
-      await addDoc(collection(db, 'bookings'), {
-        slotId: slot.id,
-        studentId: auth.currentUser.uid,
-        teacherId: slot.teacherId,
-        studentPackageId: selectedPkg.id,
-        packageId: selectedPkg.packageId,
-        packageName: selectedPkg.packageName,
-        date: slot.date,
-        time: slot.time,
-        duration: slot.duration,
-        status: 'confirmed',
-        joinLink: slot.joinLink || '',
-        createdAt: new Date()
+      batch.update(doc(db, 'studentPackages', selectedPkg.id), {
+        remainingLessons: selectedPkg.remainingLessons - slotsToBook.length
       })
-      await updateDoc(doc(db, 'studentPackages', selectedPkg.id), {
-        remainingLessons: selectedPkg.remainingLessons - 1
-      })
-      setSelectedSlotId(null)
+      await batch.commit()
+      setSelectedSlotIds([])
       setSelectedPackageId(null)
       await fetchPackages()
       await fetchSlots(selectedTeacher ? selectedTeacher.id : null, teachers)
@@ -218,7 +237,18 @@ export default function BookSlot({ lang }) {
     ...slot,
     teacherName: teachers.find(t => t.id === slot.teacherId)?.name || ''
   }))
-  const selectedSlot = enrichedSlots.find(s => s.id === selectedSlotId)
+  const selectedSlots = selectedSlotIds
+    .map(id => enrichedSlots.find(s => s.id === id))
+    .filter(Boolean)
+    .sort((a, b) => new Date(a.date + 'T' + a.time) - new Date(b.date + 'T' + b.time))
+
+  const now = new Date()
+  const bookingStats = {
+    completed: myBookings.filter(b => b.status === 'confirmed' && new Date(b.date + 'T' + b.time) < now).length,
+    missed: myBookings.filter(b => b.status === 'missed').length,
+    cancelled: myBookings.filter(b => b.status === 'cancelled').length,
+    upcoming: myBookings.filter(b => b.status === 'confirmed' && new Date(b.date + 'T' + b.time) >= now).length,
+  }
 
   return (
     <div className="max-w-xl mx-auto space-y-4">
@@ -256,14 +286,6 @@ export default function BookSlot({ lang }) {
               ? <p className="text-sm text-gray-400">{l.noTeachers}</p>
               : (
                 <div className="flex gap-2 flex-wrap">
-                  <button
-                    onClick={() => handleSelectTeacher(null)}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition
-                      ${!selectedTeacher
-                        ? 'bg-indigo-600 text-white border-indigo-600'
-                        : 'bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600'}`}>
-                    <Icon e="🌐" className="w-5 h-5 inline-block align-[-0.3em]" /> {l.allTeachers}
-                  </button>
                   {teachers.map(t => (
                     <button key={t.id}
                       onClick={() => handleSelectTeacher(t)}
@@ -279,18 +301,25 @@ export default function BookSlot({ lang }) {
             }
           </div>
 
-          {/* Calendar */}
+          {/* Calendar — click multiple slots to select them all */}
           <SlotCalendar lang={lang} mode="book" slots={enrichedSlots}
-            selectedSlotId={selectedSlotId}
-            onSelectSlot={(slot) => { setSelectedSlotId(slot.id); setSelectedPackageId(null) }} />
+            selectedSlotIds={selectedSlotIds}
+            onSelectSlot={toggleSlot} />
 
-          {/* Package + Book, shown once a slot is picked */}
-          {selectedSlot && myPackages.length > 0 && (
+          {/* Package + Book, shown once at least one slot is picked */}
+          {selectedSlots.length > 0 && myPackages.length > 0 && (
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow p-4 space-y-3">
-              <p className="font-bold dark:text-white">
-                <Icon e="📅" className="w-5 h-5 inline-block align-[-0.3em]" /> {selectedSlot.date} — <Icon e="🕐" className="w-5 h-5 inline-block align-[-0.3em]" /> {selectedSlot.time}
-                {selectedSlot.teacherName && <span className="text-indigo-500 dark:text-indigo-400"> · <Icon e="👨‍🏫" className="w-5 h-5 inline-block align-[-0.3em]" /> {selectedSlot.teacherName}</span>}
-              </p>
+              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">{l.selectedSlots}</p>
+              <div className="flex flex-wrap gap-2">
+                {selectedSlots.map(slot => (
+                  <span key={slot.id}
+                    className="inline-flex items-center gap-1.5 bg-indigo-50 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 text-xs px-2.5 py-1 rounded-full">
+                    <Icon e="📅" className="w-4 h-4 inline-block align-[-0.25em]" /> {slot.date} — {slot.time}
+                    <button onClick={() => toggleSlot(slot)} className="text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-100">×</button>
+                  </span>
+                ))}
+              </div>
+
               <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">{l.selectPackage}</p>
               <div className="space-y-2">
                 {myPackages.map(pkg => (
@@ -310,9 +339,9 @@ export default function BookSlot({ lang }) {
                   </label>
                 ))}
               </div>
-              <button onClick={() => bookSlot(selectedSlot)} disabled={loading || !selectedPackageId}
+              <button onClick={() => bookSelectedSlots(selectedSlots)} disabled={loading || !selectedPackageId}
                 className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm px-4 py-2 rounded-lg transition font-semibold">
-                {loading ? '...' : l.book}
+                {loading ? '...' : `${l.book} (${selectedSlots.length})`}
               </button>
             </div>
           )}
@@ -322,6 +351,14 @@ export default function BookSlot({ lang }) {
       {/* My Bookings */}
       {tab === 'myBookings' && (
         <div className="space-y-3">
+          {myBookings.length > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <StatTile icon="✅" label={l.completed} value={bookingStats.completed} color="green" />
+              <StatTile icon="⚠️" label={l.missed} value={bookingStats.missed} color="orange" />
+              <StatTile icon="🚫" label={l.cancelledStat} value={bookingStats.cancelled} color="gray" />
+              <StatTile icon="📅" label={l.upcomingStat} value={bookingStats.upcoming} color="indigo" />
+            </div>
+          )}
           {myBookings.length === 0 && <p className="text-center text-gray-400">{l.noBookings}</p>}
           {myBookings.map(booking => (
             <div key={booking.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow p-4 space-y-2">

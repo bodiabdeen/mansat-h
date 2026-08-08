@@ -6,6 +6,7 @@ import TeacherDashboard from '../pages/teacher/Dashboard'
 import TeacherMessages from '../pages/teacher/Messages'
 import TeacherProfile from '../pages/teacher/Profile'
 import StudentCourses from '../pages/student/Courses'
+import StudentTeachers from '../pages/student/Teachers'
 import MyPackage from '../pages/student/MyPackage'
 import BookSlot from '../pages/student/BookSlot'
 import StudentAssignments from '../pages/student/Assignments'
@@ -16,6 +17,8 @@ import Settings from '../pages/Settings'
 import AdminDashboard from '../pages/admin/Dashboard'
 import Registrations from '../pages/admin/Registrations'
 import AdminCourses from '../pages/admin/Courses'
+import AdminPromotions from '../pages/admin/Promotions'
+import SessionsReport from '../pages/admin/SessionsReport'
 import PackageRequests from '../pages/admin/PackageRequests'
 import ManageTeachers from '../pages/admin/TeacherAvailability'
 import ChatLogs from '../pages/admin/ChatLogs'
@@ -32,7 +35,9 @@ export default function PageContent({ page, setPage, userData, lang, activeRole 
     if (page === 'dashboard') return <AdminDashboard lang={lang} userData={userData} setPage={setPage} />
     if (page === 'registrations') return <Registrations lang={lang} />
     if (page === 'courses') return <AdminCourses lang={lang} />
+    if (page === 'promotions') return <AdminPromotions lang={lang} />
     if (page === 'packageRequests') return <PackageRequests lang={lang} />
+    if (page === 'sessionsReport') return <SessionsReport lang={lang} />
     if (page === 'manageTeachers') return <ManageTeachers lang={lang} />
     if (page === 'chatLogs') return <ChatLogs lang={lang} />
   }
@@ -50,7 +55,8 @@ export default function PageContent({ page, setPage, userData, lang, activeRole 
   if (isStudent) {
     if (page === 'dashboard') return <StudentDashboard lang={lang} userData={userData} setPage={setPage} />
     if (page === 'courses') return <StudentCourses lang={lang} />
-    if (page === 'myPackage') return <MyPackage lang={lang} />
+    if (page === 'teachers') return <StudentTeachers lang={lang} />
+    if (page === 'myPackage') return <MyPackage lang={lang} setPage={setPage} />
     if (page === 'bookSlot') return <BookSlot lang={lang} />
     if (page === 'assignments') return <StudentAssignments lang={lang} />
     if (page === 'achievements') return <Achievements lang={lang} />

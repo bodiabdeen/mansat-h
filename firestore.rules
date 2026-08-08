@@ -95,6 +95,13 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    // --- promotions (admin-posted ads for new courses/events on the landing page) ---
+    // Public read: marketing content, shown pre-login next to the hero.
+    match /promotions/{id} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
     // --- teacherProfiles (curated public marketing profile, separate from the
     // private `users` doc so email/uid/status never get exposed) ---
     match /teacherProfiles/{uid} {
@@ -142,7 +149,10 @@ service cloud.firestore {
 
     // --- slots ---
     match /slots/{id} {
-      allow read: if isApproved();
+      // Open (unbooked) slots are publicly readable so the pre-login landing
+      // page and course catalog can show each teacher's upcoming availability;
+      // a booked slot carries a student's uid and stays restricted.
+      allow read: if isApproved() || resource.data.booked == false;
       // Admin can add availability on behalf of any teacher, so they can help
       // manage a teacher's schedule; a teacher can only add their own.
       allow create: if isAdmin() || (isTeacher() && request.resource.data.teacherId == request.auth.uid);

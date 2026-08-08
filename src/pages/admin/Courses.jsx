@@ -11,7 +11,7 @@ const CURRENCIES = ['EGP', 'SAR', 'USD', 'GBP']
 const labels = {
   ar: {
     title: 'الدورات والباقات', addCourse: 'إضافة دورة', editCourse: 'تعديل الدورة', courseName: 'اسم الدورة',
-    description: 'الوصف (اختياري)', photo: 'صورة (اختياري)', video: 'فيديو تعريفي (اختياري)',
+    description: 'الوصف (اختياري)', photos: 'صور (اختياري)', videos: 'فيديوهات تعريفية (اختياري)',
     add: 'إضافة', update: 'تحديث', cancel: 'إلغاء', delete: 'حذف', edit: 'تعديل',
     noCourses: 'لا توجد دورات بعد', inUse: 'لا يمكن حذف دورة مرتبطة بباقات موجودة',
     packages: 'الباقات', noPackages: 'لا توجد باقات لهذه الدورة بعد',
@@ -21,7 +21,7 @@ const labels = {
   },
   en: {
     title: 'Courses & Packages', addCourse: 'Add Course', editCourse: 'Edit Course', courseName: 'Course Name',
-    description: 'Description (optional)', photo: 'Photo (optional)', video: 'Intro Video (optional)',
+    description: 'Description (optional)', photos: 'Photos (optional)', videos: 'Intro Videos (optional)',
     add: 'Add', update: 'Update', cancel: 'Cancel', delete: 'Delete', edit: 'Edit',
     noCourses: 'No courses yet', inUse: 'Cannot delete a course that has packages linked to it',
     packages: 'Packages', noPackages: 'No packages for this course yet',
@@ -40,11 +40,11 @@ export default function Courses({ lang }) {
   const [packages, setPackages] = useState([])
 
   const [form, setForm] = useState(emptyCourseForm)
-  const [photoFile, setPhotoFile] = useState(null)
-  const [videoFile, setVideoFile] = useState(null)
+  const [newPhotoFiles, setNewPhotoFiles] = useState([])
+  const [newVideoFiles, setNewVideoFiles] = useState([])
   const [editingId, setEditingId] = useState(null)
-  const [editingPhotoUrl, setEditingPhotoUrl] = useState('')
-  const [editingVideoUrl, setEditingVideoUrl] = useState('')
+  const [existingPhotoUrls, setExistingPhotoUrls] = useState([])
+  const [existingVideoUrls, setExistingVideoUrls] = useState([])
   const [loading, setLoading] = useState(false)
 
   const [pkgForm, setPkgForm] = useState(emptyPkgForm)
@@ -62,30 +62,35 @@ export default function Courses({ lang }) {
 
   const resetCourseForm = () => {
     setForm(emptyCourseForm)
-    setPhotoFile(null)
-    setVideoFile(null)
+    setNewPhotoFiles([])
+    setNewVideoFiles([])
     setEditingId(null)
-    setEditingPhotoUrl('')
-    setEditingVideoUrl('')
+    setExistingPhotoUrls([])
+    setExistingVideoUrls([])
   }
 
   const saveCourse = async () => {
     if (!form.name) return
     setLoading(true)
     try {
-      let photoUrl = editingPhotoUrl
-      let introVideoUrl = editingVideoUrl
-      if (photoFile) {
-        const r = ref(storage, `courses/${Date.now()}_${photoFile.name}`)
-        await uploadBytes(r, photoFile)
-        photoUrl = await getDownloadURL(r)
+      const uploadedPhotoUrls = await Promise.all(newPhotoFiles.map(async file => {
+        const r = ref(storage, `courses/${Date.now()}_${file.name}`)
+        await uploadBytes(r, file)
+        return getDownloadURL(r)
+      }))
+      const uploadedVideoUrls = await Promise.all(newVideoFiles.map(async file => {
+        const r = ref(storage, `courses/${Date.now()}_${file.name}`)
+        await uploadBytes(r, file)
+        return getDownloadURL(r)
+      }))
+      const photoUrls = [...existingPhotoUrls, ...uploadedPhotoUrls]
+      const videoUrls = [...existingVideoUrls, ...uploadedVideoUrls]
+      const data = {
+        name: form.name, description: form.description || '',
+        photoUrls, videoUrls,
+        // kept in sync for older screens that still read the single-value fields
+        photoUrl: photoUrls[0] || '', introVideoUrl: videoUrls[0] || ''
       }
-      if (videoFile) {
-        const r = ref(storage, `courses/${Date.now()}_${videoFile.name}`)
-        await uploadBytes(r, videoFile)
-        introVideoUrl = await getDownloadURL(r)
-      }
-      const data = { name: form.name, description: form.description || '', photoUrl, introVideoUrl }
       if (editingId) {
         await updateDoc(doc(db, 'courses', editingId), data)
       } else {
@@ -105,10 +110,10 @@ export default function Courses({ lang }) {
   const startEditCourse = (course) => {
     setEditingId(course.id)
     setForm({ name: course.name || '', description: course.description || '' })
-    setEditingPhotoUrl(course.photoUrl || '')
-    setEditingVideoUrl(course.introVideoUrl || '')
-    setPhotoFile(null)
-    setVideoFile(null)
+    setExistingPhotoUrls(course.photoUrls || (course.photoUrl ? [course.photoUrl] : []))
+    setExistingVideoUrls(course.videoUrls || (course.introVideoUrl ? [course.introVideoUrl] : []))
+    setNewPhotoFiles([])
+    setNewVideoFiles([])
   }
 
   const deleteCourse = async (id) => {
@@ -175,28 +180,47 @@ export default function Courses({ lang }) {
         <input className="input" placeholder={l.description}
           value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
 
-        <div className="flex flex-wrap gap-3 text-sm">
-          <label className="flex items-center gap-2 cursor-pointer text-indigo-600 dark:text-indigo-400">
-            <Icon e="🖼️" className="w-5 h-5 inline-block align-[-0.3em]" /> {l.photo}
-            <input type="file" accept="image/*" className="hidden"
-              onChange={e => setPhotoFile(e.target.files[0])} />
+        <div className="space-y-2 text-sm">
+          <label className="flex items-center gap-2 cursor-pointer text-indigo-600 dark:text-indigo-400 w-fit">
+            <Icon e="🖼️" className="w-5 h-5 inline-block align-[-0.3em]" /> {l.photos}
+            <input type="file" accept="image/*" multiple className="hidden"
+              onChange={e => setNewPhotoFiles([...e.target.files])} />
           </label>
-          {(photoFile || editingPhotoUrl) && (
-            <span className="text-xs text-gray-500 truncate max-w-[10rem]">
-              {photoFile ? photoFile.name : '✓ ' + l.photo}
-            </span>
+          {(existingPhotoUrls.length > 0 || newPhotoFiles.length > 0) && (
+            <div className="flex flex-wrap gap-2">
+              {existingPhotoUrls.map((url, i) => (
+                <div key={url} className="relative">
+                  <img src={url} alt="" className="w-14 h-14 rounded-lg object-cover" />
+                  <button type="button" onClick={() => setExistingPhotoUrls(existingPhotoUrls.filter((_, j) => j !== i))}
+                    className="absolute -top-1.5 -end-1.5 bg-red-500 text-white rounded-full w-5 h-5 text-xs leading-none">×</button>
+                </div>
+              ))}
+              {newPhotoFiles.map((f, i) => (
+                <span key={i} className="text-xs text-gray-500 self-center truncate max-w-[6rem]">{f.name}</span>
+              ))}
+            </div>
           )}
         </div>
-        <div className="flex flex-wrap gap-3 text-sm">
-          <label className="flex items-center gap-2 cursor-pointer text-indigo-600 dark:text-indigo-400">
-            <Icon e="🎬" className="w-5 h-5 inline-block align-[-0.3em]" /> {l.video}
-            <input type="file" accept="video/*" className="hidden"
-              onChange={e => setVideoFile(e.target.files[0])} />
+
+        <div className="space-y-2 text-sm">
+          <label className="flex items-center gap-2 cursor-pointer text-indigo-600 dark:text-indigo-400 w-fit">
+            <Icon e="🎬" className="w-5 h-5 inline-block align-[-0.3em]" /> {l.videos}
+            <input type="file" accept="video/*" multiple className="hidden"
+              onChange={e => setNewVideoFiles([...e.target.files])} />
           </label>
-          {(videoFile || editingVideoUrl) && (
-            <span className="text-xs text-gray-500 truncate max-w-[10rem]">
-              {videoFile ? videoFile.name : '✓ ' + l.video}
-            </span>
+          {(existingVideoUrls.length > 0 || newVideoFiles.length > 0) && (
+            <div className="flex flex-wrap gap-2">
+              {existingVideoUrls.map((url, i) => (
+                <div key={url} className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded-lg px-2 py-1">
+                  <span className="text-xs text-gray-600 dark:text-gray-300">🎬 {i + 1}</span>
+                  <button type="button" onClick={() => setExistingVideoUrls(existingVideoUrls.filter((_, j) => j !== i))}
+                    className="text-red-500 text-xs">×</button>
+                </div>
+              ))}
+              {newVideoFiles.map((f, i) => (
+                <span key={i} className="text-xs text-gray-500 truncate max-w-[6rem]">{f.name}</span>
+              ))}
+            </div>
           )}
         </div>
 
@@ -223,11 +247,13 @@ export default function Courses({ lang }) {
         )}
         {courses.map(course => {
           const coursePackages = packages.filter(p => p.courseId === course.id)
+          const photoUrls = course.photoUrls || (course.photoUrl ? [course.photoUrl] : [])
+          const videoUrls = course.videoUrls || (course.introVideoUrl ? [course.introVideoUrl] : [])
           return (
             <div key={course.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow p-4 space-y-3">
               <div className="flex items-start gap-3">
-                {course.photoUrl && (
-                  <img src={course.photoUrl} alt={course.name}
+                {photoUrls[0] && (
+                  <img src={photoUrls[0]} alt={course.name}
                     className="w-16 h-16 rounded-xl object-cover shrink-0" />
                 )}
                 <div className="flex-1 min-w-0">
@@ -248,8 +274,20 @@ export default function Courses({ lang }) {
                 </div>
               </div>
 
-              {course.introVideoUrl && (
-                <video controls className="w-full rounded-xl max-h-48" src={course.introVideoUrl} />
+              {photoUrls.length > 1 && (
+                <div className="flex gap-2 overflow-x-auto">
+                  {photoUrls.slice(1).map(url => (
+                    <img key={url} src={url} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0" />
+                  ))}
+                </div>
+              )}
+
+              {videoUrls.length > 0 && (
+                <div className="space-y-2">
+                  {videoUrls.map(url => (
+                    <video key={url} controls className="w-full rounded-xl max-h-48" src={url} />
+                  ))}
+                </div>
               )}
 
               {/* Packages under this course */}

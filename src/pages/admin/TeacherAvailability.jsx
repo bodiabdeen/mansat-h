@@ -3,18 +3,19 @@ import { db } from '../../firebase'
 import { collection, getDocs, query, where } from 'firebase/firestore'
 import SlotCalendar from '../../components/SlotCalendar'
 import TeacherProfileForm from '../../components/TeacherProfileForm'
+import TeacherCoursesForm from '../../components/TeacherCoursesForm'
 import Icon from '../../components/Icon'
 
 const labels = {
   ar: {
     title: 'إدارة المعلمين', selectTeacher: 'اختر معلماً لإدارة مواعيده أو ملفه التعريفي',
     noTeachers: 'لا يوجد معلمون بعد', searchPlaceholder: 'بحث عن معلم...',
-    availability: 'المواعيد', profile: 'الملف التعريفي'
+    availability: 'المواعيد', profile: 'الملف التعريفي', courses: 'الدورات'
   },
   en: {
     title: 'Manage Teachers', selectTeacher: 'Select a teacher to manage their availability or profile',
     noTeachers: 'No teachers yet', searchPlaceholder: 'Search teacher...',
-    availability: 'Availability', profile: 'Profile'
+    availability: 'Availability', profile: 'Profile', courses: 'Courses'
   }
 }
 
@@ -81,7 +82,7 @@ export default function ManageTeachers({ lang }) {
       {selected && (
         <div className="space-y-4">
           <div className="inline-flex bg-gray-100 dark:bg-gray-700 rounded-xl p-1 gap-1">
-            {['availability', 'profile'].map(t => (
+            {['availability', 'courses', 'profile'].map(t => (
               <button key={t} onClick={() => setTab(t)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition
                   ${tab === t ? 'bg-indigo-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>
@@ -93,6 +94,9 @@ export default function ManageTeachers({ lang }) {
           {tab === 'availability' && (
             <SlotCalendar lang={lang} mode="manage" teacherId={selected.id}
               slots={slots} onSlotsChanged={() => fetchSlots(selected.id)} />
+          )}
+          {tab === 'courses' && (
+            <TeacherCoursesForm lang={lang} teacherId={selected.id} />
           )}
           {tab === 'profile' && (
             <TeacherProfileForm lang={lang} teacherId={selected.id} />

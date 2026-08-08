@@ -28,6 +28,13 @@ service firebase.storage {
       allow write: if isAdmin();
     }
 
+    // Promotion media (ad photos/videos for new courses/events) — public,
+    // shown on the pre-login landing page; only admins can manage it.
+    match /promotions/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // Teacher marketing photos — public read, writable by the teacher
     // themselves or an admin on their behalf.
     match /teacherProfiles/{uid}/{allPaths=**} {

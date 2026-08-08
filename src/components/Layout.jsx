@@ -23,6 +23,7 @@ const teacherNav = [
 const studentNav = [
   { key: 'dashboard', icon: '📊' },
   { key: 'courses', icon: '📚' },
+  { key: 'teachers', icon: '👨‍🏫' },
   { key: 'myPackage', icon: '📦' },
   { key: 'bookSlot', icon: '📅' },
   { key: 'assignments', icon: '📝' },
@@ -35,7 +36,9 @@ const adminNav = [
   { key: 'dashboard', icon: '📊' },
   { key: 'registrations', icon: '🛂' },
   { key: 'courses', icon: '📚' },
+  { key: 'promotions', icon: '📣' },
   { key: 'packageRequests', icon: '💳' },
+  { key: 'sessionsReport', icon: '📈' },
   { key: 'manageTeachers', icon: '👨‍🏫' },
   { key: 'chatLogs', icon: '🗂️' },
   { key: 'settings', icon: '⚙️' },
@@ -45,17 +48,19 @@ const navLabels = {
   ar: {
     dashboard: 'الرئيسية', packages: 'الباقات', slots: 'المواعيد',
     assignments: 'الواجبات', students: 'الطلاب',
-    myPackage: 'باقاتي', bookSlot: 'حجز موعد', achievements: 'إنجازاتي',
+    myPackage: 'باقاتي', bookSlot: 'حجوزاتي', achievements: 'إنجازاتي',
     logout: 'تسجيل الخروج', settings: 'الإعدادات',
-    registrations: 'طلبات التسجيل', courses: 'الدورات والباقات', packageRequests: 'طلبات الدفع',
+    registrations: 'طلبات التسجيل', courses: 'الدورات والباقات', teachers: 'معلمونا', promotions: 'الإعلانات والعروض', packageRequests: 'طلبات الدفع',
+    sessionsReport: 'تقرير الحصص',
     messages: 'الرسائل', manageTeachers: 'إدارة المعلمين', chatLogs: 'سجل المحادثات', profile: 'ملفي التعريفي'
   },
   en: {
     dashboard: 'Dashboard', packages: 'Packages', slots: 'Slots',
     assignments: 'Assignments', students: 'Students',
-    myPackage: 'My Packages', bookSlot: 'Book Slot', achievements: 'Achievements',
+    myPackage: 'My Packages', bookSlot: 'My Bookings', achievements: 'Achievements',
     logout: 'Logout', settings: 'Settings',
-    registrations: 'Registrations', courses: 'Courses & Packages', packageRequests: 'Payment Requests',
+    registrations: 'Registrations', courses: 'Courses & Packages', teachers: 'Our Teachers', promotions: 'Promotions & Events', packageRequests: 'Payment Requests',
+    sessionsReport: 'Sessions Report',
     messages: 'Messages', manageTeachers: 'Manage Teachers', chatLogs: 'Chat Logs', profile: 'My Profile'
   }
 }
