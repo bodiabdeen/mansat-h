@@ -66,7 +66,7 @@ export default function Dashboard({ lang, userData, setPage }) {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-6">
       <div>
         <h2 className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
           <Icon e="📊" className="w-7 h-7 inline-block align-[-0.3em]" /> {l.title}
@@ -76,10 +76,10 @@ export default function Dashboard({ lang, userData, setPage }) {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {cards.map(card => (
           <button key={card.label} onClick={() => setPage?.(card.page)}
-            className={`rounded-2xl p-4 text-center transition hover:opacity-80 hover:scale-[1.02] ${colorMap[card.color]}`}>
+            className={`rounded-2xl p-4 text-center transition hover:opacity-80 hover:scale-[1.02] cursor-pointer ${colorMap[card.color]}`}>
             <div className="text-3xl mb-1"><Icon e={card.icon} className="w-8 h-8 inline-block align-[-0.3em]" /></div>
             <div className="text-2xl font-bold">{card.value}</div>
             <div className="text-xs mt-1 opacity-80">{card.label}</div>

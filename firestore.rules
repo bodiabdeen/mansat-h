@@ -58,6 +58,19 @@ service cloud.firestore {
       return exists(/databases/$(database)/documents/connections/$(teacherId + '_' + studentId));
     }
 
+    // examPurchases is keyed by `${studentId}_${examId}` (same convention as
+    // studentPackages' doc id) so this can be a cheap, provable-safe lookup.
+    // Capped at 5 attempts per purchase — once used up, this returns false
+    // (blocking both examContent reads and new examAttempts) until the
+    // student buys again, which resets attemptsUsed back to 0.
+    function hasActiveExamPurchase(examId) {
+      let purchaseId = request.auth.uid + '_' + examId;
+      let purchase = get(/databases/$(database)/documents/examPurchases/$(purchaseId)).data;
+      return exists(/databases/$(database)/documents/examPurchases/$(purchaseId))
+        && purchase.status == 'active'
+        && purchase.get('attemptsUsed', 0) < 5;
+    }
+
     // --- users ---
     match /users/{uid} {
       allow create: if isSignedIn() && request.auth.uid == uid
@@ -224,6 +237,56 @@ service cloud.firestore {
       allow update: if isAdmin()
         || (isSignedIn() && resource.data.recipientId == request.auth.uid && onlyFieldsChanged(['read']));
       // Admin-only moderation: delete an individual message or a whole conversation.
+      allow delete: if isAdmin();
+    }
+
+    // --- exams (catalog metadata only — title/description/price; no answer
+    // key here, so browsing the catalog before purchasing never exposes it) ---
+    match /exams/{id} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // --- examContent (the actual questions + answer key) ---
+    // Gated to admin or a student with an active purchase for this exam.
+    match /examContent/{examId} {
+      allow read: if isAdmin() || (isApproved() && hasActiveExamPurchase(examId));
+      allow create, update, delete: if isAdmin();
+    }
+
+    // --- examPurchases (student purchase requests; admin approves, same
+    // pending_approval -> active flow as studentPackages) ---
+    // Doc id is `${studentId}_${examId}` — see hasActiveExamPurchase() above.
+    match /examPurchases/{id} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.studentId == request.auth.uid);
+      allow create: if isStudent()
+        && request.resource.data.studentId == request.auth.uid
+        && request.resource.data.status == 'pending_approval';
+      allow update: if isAdmin()
+        // Resubmitting after rejection OR after using up all 5 attempts
+        // reuses the same doc id (studentId_examId), which Firestore treats
+        // as an update, not a create — so re-buying has to reset
+        // attemptsUsed back to 0 and go through approval again, same as a
+        // first purchase.
+        || (isStudent() && resource.data.studentId == request.auth.uid
+            && request.resource.data.studentId == request.auth.uid
+            && request.resource.data.status == 'pending_approval'
+            && request.resource.data.attemptsUsed == 0)
+        // Recording a finished attempt — the student may only bump their
+        // own counter by exactly one, nothing else.
+        || (isStudent() && resource.data.studentId == request.auth.uid
+            && onlyFieldsChanged(['attemptsUsed'])
+            && request.resource.data.attemptsUsed == resource.data.get('attemptsUsed', 0) + 1);
+    }
+
+    // --- examAttempts (one immutable, self-contained record per submitted
+    // attempt — snapshots the exam's questions/answers so a later edit to the
+    // exam can never retroactively change a past report) ---
+    match /examAttempts/{id} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.studentId == request.auth.uid);
+      allow create: if isStudent()
+        && request.resource.data.studentId == request.auth.uid
+        && hasActiveExamPurchase(request.resource.data.examId);
       allow delete: if isAdmin();
     }
   }

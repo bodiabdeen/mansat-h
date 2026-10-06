@@ -1,7 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import { db, auth } from '../firebase'
-import { collection, addDoc, getDocs, query, where, doc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore'
+import { collection, addDoc, onSnapshot, query, where, doc, updateDoc, deleteDoc, writeBatch, serverTimestamp } from 'firebase/firestore'
 import Icon from './Icon'
+
+function formatMessageTime(createdAt, lang) {
+  const date = createdAt?.toDate?.()
+  if (!date) return ''
+  const locale = lang === 'ar' ? 'ar' : 'en'
+  const now = new Date()
+  const isToday = date.toDateString() === now.toDateString()
+  const time = date.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' })
+  if (isToday) return time
+  return `${date.toLocaleDateString(locale, { month: 'short', day: 'numeric' })} · ${time}`
+}
 
 const labels = {
   ar: {
@@ -29,33 +40,37 @@ export default function ChatThread({ lang, teacherId, studentId, otherName, onRe
   const [error, setError] = useState('')
   const bottomRef = useRef(null)
 
-  const fetchMessages = async () => {
+  // Live subscription — the read rule checks `uid in participants`, so the
+  // query must filter on that same field; filtering by threadId alone can't
+  // be proven safe by Firestore's rules engine and gets rejected outright.
+  useEffect(() => {
     setError('')
-    try {
-      // The read rule checks `uid in participants`, so the query must filter
-      // on that same field — filtering by threadId alone can't be proven safe
-      // by Firestore's rules engine and gets rejected outright.
-      const snap = await getDocs(query(
-        collection(db, 'messages'),
-        where('participants', 'array-contains', uid),
-        where('threadId', '==', threadId)
-      ))
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      list.sort((a, b) => (a.createdAt?.toMillis?.() || 0) - (b.createdAt?.toMillis?.() || 0))
+    const q = query(
+      collection(db, 'messages'),
+      where('participants', 'array-contains', uid),
+      where('threadId', '==', threadId)
+    )
+    const unsubscribe = onSnapshot(q, snap => {
+      const list = snap.docs.map(d => {
+        const data = d.data()
+        // A just-sent message hasn't round-tripped to the server yet, so its
+        // serverTimestamp() is still null in this optimistic local snapshot —
+        // fall back to "now" (not 0) so it sorts to the end, not the start.
+        return { id: d.id, ...data, _sortMillis: data.createdAt?.toMillis?.() ?? Date.now() }
+      })
+      list.sort((a, b) => a._sortMillis - b._sortMillis)
       setMessages(list)
 
       const unread = list.filter(m => m.recipientId === uid && !m.read)
       if (unread.length > 0) {
-        await Promise.all(unread.map(m => updateDoc(doc(db, 'messages', m.id), { read: true })))
-        onRead?.()
+        Promise.all(unread.map(m => updateDoc(doc(db, 'messages', m.id), { read: true }))).then(() => onRead?.())
       }
-    } catch (e) {
-      console.error(e)
+    }, err => {
+      console.error(err)
       setError(l.loadError)
-    }
-  }
-
-  useEffect(() => { fetchMessages() }, [threadId])
+    })
+    return unsubscribe
+  }, [threadId])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -71,10 +86,13 @@ export default function ChatThread({ lang, teacherId, studentId, otherName, onRe
         threadId, teacherId, studentId,
         participants: [teacherId, studentId],
         senderId: uid, recipientId,
-        text: text.trim(), read: false, createdAt: new Date()
+        // serverTimestamp(), not a client Date — two people's devices can
+        // disagree on the time, which broke chronological ordering between
+        // them (all of one side's messages would sort before/after the
+        // other's). The server clock is the single shared source of truth.
+        text: text.trim(), read: false, createdAt: serverTimestamp()
       })
       setText('')
-      await fetchMessages()
     } catch (e) {
       console.error(e)
       setError(l.loadError)
@@ -84,7 +102,6 @@ export default function ChatThread({ lang, teacherId, studentId, otherName, onRe
 
   const deleteMessage = async (id) => {
     await deleteDoc(doc(db, 'messages', id))
-    await fetchMessages()
     onMessagesChanged?.()
   }
 
@@ -97,7 +114,7 @@ export default function ChatThread({ lang, teacherId, studentId, otherName, onRe
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow flex flex-col h-[28rem]">
+    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow flex flex-col h-[32rem]">
       <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
         <span className="font-semibold text-gray-800 dark:text-white"><Icon e="👤" className="w-5 h-5 inline-block align-[-0.3em]" /> {otherName}</span>
         {canDelete && (
@@ -114,7 +131,7 @@ export default function ChatThread({ lang, teacherId, studentId, otherName, onRe
           <p className="text-center text-gray-400 text-sm mt-4">{l.noMessages}</p>
         )}
         {messages.map(m => (
-          <div key={m.id} className={`flex items-center gap-2 ${m.senderId === uid ? 'justify-end' : 'justify-start'}`}>
+          <div key={m.id} className={`flex items-end gap-2 ${m.senderId === uid ? 'justify-end' : 'justify-start'}`}>
             {canDelete && m.senderId === uid && (
               <button onClick={() => deleteMessage(m.id)} title={l.deleteMessage}
                 className="text-gray-300 hover:text-red-500 text-xs transition"><Icon e="🗑️" className="w-4 h-4 inline-block align-[-0.3em]" /></button>
@@ -124,6 +141,9 @@ export default function ChatThread({ lang, teacherId, studentId, otherName, onRe
                 ? 'bg-indigo-600 text-white'
                 : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100'}`}>
               {m.text}
+              <div className={`text-[10px] mt-1 ${m.senderId === uid ? 'text-indigo-100/80' : 'text-gray-400 dark:text-gray-500'}`}>
+                {formatMessageTime(m.createdAt, lang) || '·'}
+              </div>
             </div>
             {canDelete && m.senderId !== uid && (
               <button onClick={() => deleteMessage(m.id)} title={l.deleteMessage}

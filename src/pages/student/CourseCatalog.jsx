@@ -91,11 +91,12 @@ export default function CourseCatalog({ lang }) {
   const myStatusFor = (pkgId) => myPackages.find(sp => sp.packageId === pkgId)?.status || null
 
   return (
-    <div className="space-y-3">
+    <div>
       {courses.length === 0 && (
         <p className="text-center text-gray-400">{l.noCourses}</p>
       )}
 
+      <div className="grid md:grid-cols-2 gap-4">
       {courses.map(course => {
         const coursePackages = packages.filter(p => p.courseId === course.id)
         return (
@@ -178,6 +179,7 @@ export default function CourseCatalog({ lang }) {
           </div>
         )
       })}
+      </div>
     </div>
   )
 }

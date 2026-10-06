@@ -5,6 +5,7 @@ import {
 } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import Icon from '../../components/Icon'
+import PageHero from '../../components/PageHero'
 
 const labels = {
   ar: {
@@ -58,11 +59,11 @@ export default function StudentAssignments({ lang }) {
   }
 
   return (
-    <div className="max-w-xl mx-auto space-y-6">
-      <h2 className="text-xl font-bold text-indigo-600 dark:text-indigo-400"><Icon e="📝" className="w-7 h-7 inline-block align-[-0.3em]" /> {l.title}</h2>
+    <div className="max-w-4xl mx-auto space-y-6">
+      <PageHero icon="📝" title={l.title} />
 
-      <div className="space-y-3">
-        {assignments.length === 0 && <p className="text-center text-gray-400">{l.noAssignments}</p>}
+      {assignments.length === 0 && <p className="text-center text-gray-400">{l.noAssignments}</p>}
+      <div className="grid md:grid-cols-2 gap-4">
         {assignments.map(a => (
           <div key={a.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow p-4 space-y-2">
             <div className="flex items-center justify-between">

@@ -26,6 +26,7 @@ const studentNav = [
   { key: 'teachers', icon: '👨‍🏫' },
   { key: 'myPackage', icon: '📦' },
   { key: 'bookSlot', icon: '📅' },
+  { key: 'exams', icon: '🧪' },
   { key: 'assignments', icon: '📝' },
   { key: 'achievements', icon: '🏆' },
   { key: 'messages', icon: '💬' },
@@ -37,6 +38,8 @@ const adminNav = [
   { key: 'registrations', icon: '🛂' },
   { key: 'courses', icon: '📚' },
   { key: 'promotions', icon: '📣' },
+  { key: 'exams', icon: '🧪' },
+  { key: 'examRequests', icon: '🧾' },
   { key: 'packageRequests', icon: '💳' },
   { key: 'sessionsReport', icon: '📈' },
   { key: 'manageTeachers', icon: '👨‍🏫' },
@@ -48,18 +51,20 @@ const navLabels = {
   ar: {
     dashboard: 'الرئيسية', packages: 'الباقات', slots: 'المواعيد',
     assignments: 'الواجبات', students: 'الطلاب',
-    myPackage: 'باقاتي', bookSlot: 'حجوزاتي', achievements: 'إنجازاتي',
+    myPackage: 'باقاتي', bookSlot: 'حجوزاتي', achievements: 'إنجازاتي', exams: 'الاختبارات',
     logout: 'تسجيل الخروج', settings: 'الإعدادات',
     registrations: 'طلبات التسجيل', courses: 'الدورات والباقات', teachers: 'معلمونا', promotions: 'الإعلانات والعروض', packageRequests: 'طلبات الدفع',
+    examRequests: 'طلبات شراء الاختبارات',
     sessionsReport: 'تقرير الحصص',
     messages: 'الرسائل', manageTeachers: 'إدارة المعلمين', chatLogs: 'سجل المحادثات', profile: 'ملفي التعريفي'
   },
   en: {
     dashboard: 'Dashboard', packages: 'Packages', slots: 'Slots',
     assignments: 'Assignments', students: 'Students',
-    myPackage: 'My Packages', bookSlot: 'My Bookings', achievements: 'Achievements',
+    myPackage: 'My Packages', bookSlot: 'My Bookings', achievements: 'Achievements', exams: 'Exams',
     logout: 'Logout', settings: 'Settings',
     registrations: 'Registrations', courses: 'Courses & Packages', teachers: 'Our Teachers', promotions: 'Promotions & Events', packageRequests: 'Payment Requests',
+    examRequests: 'Exam Requests',
     sessionsReport: 'Sessions Report',
     messages: 'Messages', manageTeachers: 'Manage Teachers', chatLogs: 'Chat Logs', profile: 'My Profile'
   }

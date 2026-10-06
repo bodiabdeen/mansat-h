@@ -7,6 +7,8 @@ import BrandMark from '../components/BrandMark'
 import Icon from '../components/Icon'
 import PromoCarousel from '../components/PromoCarousel'
 import TeachersShowcase from '../components/TeachersShowcase'
+import WaveDivider from '../components/WaveDivider'
+import GoldArc from '../components/GoldArc'
 import '../i18n'
 
 const labels = {
@@ -70,9 +72,11 @@ export default function Landing({ onGetStarted, onLogin }) {
   return (
     <div className={`min-h-screen bg-gray-50 dark:bg-indigo-950 text-gray-900 dark:text-white ${isAr ? 'rtl' : 'ltr'}`}>
 
-      {/* Dark green band: header + hero, matching the brand board's website preview */}
-      <div className="bg-gradient-to-b from-indigo-900 via-indigo-900 to-indigo-700 text-white">
-        <header className="flex items-center justify-between px-4 md:px-8 py-4 max-w-6xl mx-auto">
+      {/* Dark band: header + hero, matching the brand board's website preview */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-indigo-950 via-indigo-800 to-indigo-600 text-white">
+        <div className="absolute -top-16 -end-16 w-72 h-72 rounded-full bg-gold-400/25 blur-3xl pointer-events-none" />
+        <div className="absolute top-1/3 -start-20 w-64 h-64 rounded-full bg-indigo-400/20 blur-3xl pointer-events-none" />
+        <header className="relative flex items-center justify-between px-4 md:px-8 py-4 max-w-6xl mx-auto">
           <span className="flex items-center gap-2 text-lg font-bold" dir="rtl">
             <BrandMark className="w-10 h-8" />
             بروف <span className="font-normal opacity-70">| PROF</span>
@@ -108,7 +112,7 @@ export default function Landing({ onGetStarted, onLogin }) {
             <h1 className="text-3xl md:text-4xl font-bold leading-tight text-balance">{l.heroTitle}</h1>
             <p className="text-indigo-100 text-base md:text-lg max-w-xl mx-auto opacity-90">{l.heroBody}</p>
             <button onClick={onGetStarted}
-              className="bg-gold-500 hover:bg-gold-400 text-indigo-900 px-8 py-3 rounded-xl font-bold text-base transition shadow-lg shadow-black/20">
+              className="bg-gradient-to-br from-gold-400 via-gold-500 to-gold-600 hover:opacity-90 text-indigo-900 px-8 py-3 rounded-xl font-bold text-base transition shadow-lg shadow-black/20">
               {l.getStarted}
             </button>
           </section>
@@ -117,7 +121,7 @@ export default function Landing({ onGetStarted, onLogin }) {
             <div className="w-full md:w-[380px] md:shrink-0 space-y-4">
               {featuredPromotions.map(promo => (
                 <div key={promo.id} className="bg-white/10 backdrop-blur border border-white/15 rounded-2xl p-4 space-y-3 text-start">
-                  <span className="inline-block bg-gold-500 text-indigo-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                  <span className="inline-block bg-gradient-to-r from-gold-400 to-gold-600 text-indigo-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
                     {l.newBadge}
                   </span>
                   <PromoCarousel media={[
@@ -135,13 +139,14 @@ export default function Landing({ onGetStarted, onLogin }) {
             </div>
           )}
         </div>
+        <WaveDivider fillClassName="fill-gray-50 dark:fill-indigo-950" />
       </div>
 
       {/* Courses & Packages */}
       <section className="max-w-5xl mx-auto px-4 py-12">
         <div className="text-center mb-8">
           <h2 className="text-2xl font-bold">{l.coursesTitle}</h2>
-          <div className="w-14 h-1 bg-gold-500 rounded-full mx-auto my-2" />
+          <GoldArc />
           <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">{l.coursesBody}</p>
         </div>
 
@@ -202,7 +207,7 @@ export default function Landing({ onGetStarted, onLogin }) {
       <section className="max-w-5xl mx-auto px-4 py-12">
         <div className="text-center mb-8">
           <h2 className="text-2xl font-bold">{l.teachersTitle}</h2>
-          <div className="w-14 h-1 bg-gold-500 rounded-full mx-auto my-2" />
+          <GoldArc />
           <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">{l.teachersBody}</p>
         </div>
 
@@ -214,7 +219,7 @@ export default function Landing({ onGetStarted, onLogin }) {
         <section className="max-w-5xl mx-auto px-4 py-12">
           <div className="text-center mb-8">
             <h2 className="text-2xl font-bold">{l.morePromosTitle}</h2>
-            <div className="w-14 h-1 bg-gold-500 rounded-full mx-auto my-2" />
+            <GoldArc />
             <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">{l.morePromosBody}</p>
           </div>
 

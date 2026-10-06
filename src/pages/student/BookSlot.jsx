@@ -6,6 +6,7 @@ import {
 } from 'firebase/firestore'
 import SlotCalendar from '../../components/SlotCalendar'
 import StatTile from '../../components/StatTile'
+import PageHero from '../../components/PageHero'
 import Icon from '../../components/Icon'
 
 const labels = {
@@ -251,8 +252,8 @@ export default function BookSlot({ lang }) {
   }
 
   return (
-    <div className="max-w-xl mx-auto space-y-4">
-      <h2 className="text-xl font-bold text-indigo-600 dark:text-indigo-400"><Icon e="📅" className="w-7 h-7 inline-block align-[-0.3em]" /> {l.title}</h2>
+    <div className="max-w-5xl mx-auto space-y-4">
+      <PageHero icon="📅" title={l.title} />
 
       {/* Tabs */}
       <div className="flex gap-2">
@@ -271,44 +272,46 @@ export default function BookSlot({ lang }) {
 
       {/* Available Slots */}
       {tab === 'available' && (
-        <div className="space-y-4">
-          {/* Package warning */}
-          {myPackages.length === 0 && (
-            <div className="bg-yellow-50 dark:bg-yellow-900 rounded-lg p-4 text-center text-sm text-yellow-700 dark:text-yellow-300">
-              <Icon e="📦" className="w-5 h-5 inline-block align-[-0.3em]" /> {l.noPackage}
-            </div>
-          )}
+        <div className="lg:flex lg:gap-5 lg:items-start space-y-4 lg:space-y-0">
+          <div className="flex-1 space-y-4 min-w-0">
+            {/* Package warning */}
+            {myPackages.length === 0 && (
+              <div className="bg-yellow-50 dark:bg-yellow-900 rounded-lg p-4 text-center text-sm text-yellow-700 dark:text-yellow-300">
+                <Icon e="📦" className="w-5 h-5 inline-block align-[-0.3em]" /> {l.noPackage}
+              </div>
+            )}
 
-          {/* Teacher selector */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow p-4 space-y-3">
-            <p className="text-sm font-semibold text-gray-500 dark:text-gray-400"><Icon e="👨‍🏫" className="w-5 h-5 inline-block align-[-0.3em]" /> {l.selectTeacher}</p>
-            {teachers.length === 0
-              ? <p className="text-sm text-gray-400">{l.noTeachers}</p>
-              : (
-                <div className="flex gap-2 flex-wrap">
-                  {teachers.map(t => (
-                    <button key={t.id}
-                      onClick={() => handleSelectTeacher(t)}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition
-                        ${selectedTeacher?.id === t.id
-                          ? 'bg-indigo-600 text-white border-indigo-600'
-                          : 'bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600'}`}>
-                      <Icon e="👤" className="w-5 h-5 inline-block align-[-0.3em]" /> {t.name}
-                    </button>
-                  ))}
-                </div>
-              )
-            }
+            {/* Teacher selector */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow p-4 space-y-3">
+              <p className="text-sm font-semibold text-gray-500 dark:text-gray-400"><Icon e="👨‍🏫" className="w-5 h-5 inline-block align-[-0.3em]" /> {l.selectTeacher}</p>
+              {teachers.length === 0
+                ? <p className="text-sm text-gray-400">{l.noTeachers}</p>
+                : (
+                  <div className="flex gap-2 flex-wrap">
+                    {teachers.map(t => (
+                      <button key={t.id}
+                        onClick={() => handleSelectTeacher(t)}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition
+                          ${selectedTeacher?.id === t.id
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : 'bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600'}`}>
+                        <Icon e="👤" className="w-5 h-5 inline-block align-[-0.3em]" /> {t.name}
+                      </button>
+                    ))}
+                  </div>
+                )
+              }
+            </div>
+
+            {/* Calendar — click multiple slots to select them all */}
+            <SlotCalendar lang={lang} mode="book" slots={enrichedSlots}
+              selectedSlotIds={selectedSlotIds}
+              onSelectSlot={toggleSlot} />
           </div>
 
-          {/* Calendar — click multiple slots to select them all */}
-          <SlotCalendar lang={lang} mode="book" slots={enrichedSlots}
-            selectedSlotIds={selectedSlotIds}
-            onSelectSlot={toggleSlot} />
-
-          {/* Package + Book, shown once at least one slot is picked */}
+          {/* Package + Book, shown once at least one slot is picked — sidebar on large screens */}
           {selectedSlots.length > 0 && myPackages.length > 0 && (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow p-4 space-y-3">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow p-4 space-y-3 lg:w-80 lg:shrink-0 lg:sticky lg:top-4">
               <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">{l.selectedSlots}</p>
               <div className="flex flex-wrap gap-2">
                 {selectedSlots.map(slot => (
@@ -340,7 +343,7 @@ export default function BookSlot({ lang }) {
                 ))}
               </div>
               <button onClick={() => bookSelectedSlots(selectedSlots)} disabled={loading || !selectedPackageId}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm px-4 py-2 rounded-lg transition font-semibold">
+                className="w-full bg-gradient-to-br from-gold-400 to-gold-600 disabled:opacity-50 text-indigo-900 text-sm px-4 py-2 rounded-lg transition font-bold hover:opacity-90">
                 {loading ? '...' : `${l.book} (${selectedSlots.length})`}
               </button>
             </div>
@@ -360,6 +363,7 @@ export default function BookSlot({ lang }) {
             </div>
           )}
           {myBookings.length === 0 && <p className="text-center text-gray-400">{l.noBookings}</p>}
+          <div className="grid md:grid-cols-2 gap-3">
           {myBookings.map(booking => (
             <div key={booking.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow p-4 space-y-2">
               <div className="flex items-center justify-between">
@@ -414,6 +418,7 @@ export default function BookSlot({ lang }) {
               )}
             </div>
           ))}
+          </div>
         </div>
       )}
     </div>

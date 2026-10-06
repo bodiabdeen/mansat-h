@@ -3,6 +3,7 @@ import { db, auth } from '../../firebase'
 import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore'
 import ChatThread from '../../components/ChatThread'
 import Icon from '../../components/Icon'
+import PageHero from '../../components/PageHero'
 
 const labels = {
   ar: { title: 'الرسائل', noContacts: 'لا يوجد معلمون معتمدون بعد للمراسلة', selectContact: 'اختر معلماً للمحادثة' },
@@ -40,38 +41,41 @@ export default function Messages({ lang }) {
   useEffect(() => { fetchContacts() }, [])
 
   return (
-    <div className="max-w-xl mx-auto space-y-4">
-      <h2 className="text-xl font-bold text-indigo-600 dark:text-indigo-400"><Icon e="💬" className="w-7 h-7 inline-block align-[-0.3em]" /> {l.title}</h2>
+    <div className="max-w-4xl mx-auto space-y-4">
+      <PageHero icon="💬" title={l.title} />
 
       {teachers.length === 0 && (
         <p className="text-center text-gray-400">{l.noContacts}</p>
       )}
 
-      <div className="flex gap-2 flex-wrap">
-        {teachers.map(t => (
-          <button key={t.id} onClick={() => setSelected(t)}
-            className={`relative px-4 py-2 rounded-xl text-sm font-medium transition border
-              ${selected?.id === t.id
-                ? 'bg-indigo-600 text-white border-indigo-600'
-                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-indigo-400'}`}>
-            <Icon e="👤" className="w-5 h-5 inline-block align-[-0.3em]" /> {t.name}
-            {unread[t.id] > 0 && (
-              <span className="absolute -top-1.5 -end-1.5 bg-red-500 text-white text-[10px] leading-none rounded-full min-w-[1.1rem] h-[1.1rem] flex items-center justify-center px-1">
-                {unread[t.id] > 9 ? '9+' : unread[t.id]}
-              </span>
-            )}
-          </button>
-        ))}
+      <div className="md:flex md:gap-5 md:items-start">
+        <div className="flex gap-2 flex-wrap md:flex-col md:w-56 md:shrink-0">
+          {teachers.map(t => (
+            <button key={t.id} onClick={() => setSelected(t)}
+              className={`relative px-4 py-2 rounded-xl text-sm font-medium transition border md:text-start
+                ${selected?.id === t.id
+                  ? 'bg-indigo-600 text-white border-indigo-600'
+                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-indigo-400'}`}>
+              <Icon e="👤" className="w-5 h-5 inline-block align-[-0.3em]" /> {t.name}
+              {unread[t.id] > 0 && (
+                <span className="absolute -top-1.5 -end-1.5 bg-red-500 text-white text-[10px] leading-none rounded-full min-w-[1.1rem] h-[1.1rem] flex items-center justify-center px-1">
+                  {unread[t.id] > 9 ? '9+' : unread[t.id]}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex-1 mt-4 md:mt-0 min-w-0">
+          {teachers.length > 0 && !selected && (
+            <p className="text-center text-gray-400 text-sm">{l.selectContact}</p>
+          )}
+          {selected && (
+            <ChatThread lang={lang} teacherId={selected.id} studentId={auth.currentUser.uid}
+              otherName={selected.name} onRead={fetchContacts} />
+          )}
+        </div>
       </div>
-
-      {teachers.length > 0 && !selected && (
-        <p className="text-center text-gray-400 text-sm">{l.selectContact}</p>
-      )}
-
-      {selected && (
-        <ChatThread lang={lang} teacherId={selected.id} studentId={auth.currentUser.uid}
-          otherName={selected.name} onRead={fetchContacts} />
-      )}
     </div>
   )
 }

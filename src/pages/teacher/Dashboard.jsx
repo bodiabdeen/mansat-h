@@ -90,7 +90,7 @@ export default function TeacherDashboard({ lang, userData, setPage }) {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-6">
       <div>
         <h2 className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
           <Icon e="📊" className="w-7 h-7 inline-block align-[-0.35em]" /> {l.title}
@@ -101,10 +101,10 @@ export default function TeacherDashboard({ lang, userData, setPage }) {
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {cards.map(card => (
           <button key={card.label} onClick={() => setPage?.(card.page)}
-            className={`rounded-2xl p-4 text-center transition hover:opacity-80 hover:scale-[1.02] ${colorMap[card.color]}`}>
+            className={`rounded-2xl p-4 text-center transition hover:opacity-80 hover:scale-[1.02] cursor-pointer ${colorMap[card.color]}`}>
             <div className="text-3xl mb-1"><Icon e={card.icon} className="w-8 h-8 inline-block" /></div>
             <div className="text-2xl font-bold">{card.value}</div>
             <div className="text-xs mt-1 opacity-80">{card.label}</div>
@@ -113,31 +113,36 @@ export default function TeacherDashboard({ lang, userData, setPage }) {
       </div>
 
       {/* Upcoming Slots */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow p-4 space-y-3">
+      <button onClick={() => setPage?.('slots')}
+        className="w-full text-start bg-white dark:bg-gray-800 rounded-2xl shadow p-4 space-y-3 hover:shadow-md transition cursor-pointer">
         <p className="font-semibold text-sm text-gray-500 dark:text-gray-400"><Icon e="📅" className="w-5 h-5 inline-block align-[-0.3em]" /> {l.upcomingSlots}</p>
         {upcoming.length === 0
           ? <p className="text-center text-gray-400 text-sm">{l.noUpcoming}</p>
-          : upcoming.map(slot => (
-            <div key={slot.id}
-              className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
-              <div>
-                <p className="text-sm font-medium dark:text-white">
-                  <Icon e="📅" className="w-5 h-5 inline-block align-[-0.3em]" /> {slot.date} — <Icon e="🕐" className="w-5 h-5 inline-block align-[-0.3em]" /> {slot.time}
-                </p>
-                <p className="text-xs text-gray-400"><Icon e="⏱" className="w-4 h-4 inline-block align-[-0.3em]" /> {slot.duration} {l.minutes}</p>
-              </div>
-              <span className={`text-xs px-2 py-0.5 rounded-full
-                ${slot.booked
-                  ? 'bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-300'
-                  : 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300'}`}>
-                {slot.booked
-                  ? <Icon e="🔒" className="w-4 h-4 inline-block" />
-                  : <Icon e="✅" className="w-4 h-4 inline-block" />}
-              </span>
+          : (
+            <div className="grid md:grid-cols-2 gap-2">
+              {upcoming.map(slot => (
+                <div key={slot.id}
+                  className="flex items-center justify-between py-2 px-1 border-b md:border border-gray-100 dark:border-gray-700 last:border-0 md:rounded-xl md:px-3">
+                  <div>
+                    <p className="text-sm font-medium dark:text-white">
+                      <Icon e="📅" className="w-5 h-5 inline-block align-[-0.3em]" /> {slot.date} — <Icon e="🕐" className="w-5 h-5 inline-block align-[-0.3em]" /> {slot.time}
+                    </p>
+                    <p className="text-xs text-gray-400"><Icon e="⏱" className="w-4 h-4 inline-block align-[-0.3em]" /> {slot.duration} {l.minutes}</p>
+                  </div>
+                  <span className={`text-xs px-2 py-0.5 rounded-full
+                    ${slot.booked
+                      ? 'bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-300'
+                      : 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300'}`}>
+                    {slot.booked
+                      ? <Icon e="🔒" className="w-4 h-4 inline-block" />
+                      : <Icon e="✅" className="w-4 h-4 inline-block" />}
+                  </span>
+                </div>
+              ))}
             </div>
-          ))
+          )
         }
-      </div>
+      </button>
     </div>
   )
 }
