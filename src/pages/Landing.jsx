@@ -76,24 +76,23 @@ export default function Landing({ onGetStarted, onLogin }) {
       <div className="relative overflow-hidden bg-gradient-to-br from-indigo-950 via-indigo-800 to-indigo-600 text-white">
         <div className="absolute -top-16 -end-16 w-72 h-72 rounded-full bg-gold-400/25 blur-3xl pointer-events-none" />
         <div className="absolute top-1/3 -start-20 w-64 h-64 rounded-full bg-indigo-400/20 blur-3xl pointer-events-none" />
-        <header className="relative flex items-center justify-between px-4 md:px-8 py-4 max-w-6xl mx-auto">
-          <span className="flex items-center gap-2 text-lg font-bold" dir="rtl">
+        <header className="relative flex items-center justify-between px-4 py-3 max-w-6xl mx-auto">
+          <span className="flex items-center gap-2 text-lg font-bold" dir="rtl" aria-label="PROF">
             <BrandMark className="w-10 h-8" />
-            بروف <span className="font-normal opacity-70">| PROF</span>
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <button onClick={toggleLang}
-              className="bg-white/10 hover:bg-white/20 border border-white/20 px-3 py-1.5 rounded-lg text-sm">
+              className="bg-white/10 hover:bg-white/20 border border-white/20 px-2.5 py-1.5 rounded-lg text-sm">
               {lang === 'ar' ? 'EN' : 'ع'}
             </button>
             <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="bg-white/10 hover:bg-white/20 border border-white/20 px-3 py-1.5 rounded-lg text-sm">
+              className="bg-white/10 hover:bg-white/20 border border-white/20 px-2.5 py-1.5 rounded-lg text-sm">
               {theme === 'dark'
                 ? <Icon e="☀️" className="w-5 h-5 inline-block align-[-0.3em]" />
                 : <Icon e="🌙" className="w-5 h-5 inline-block align-[-0.3em]" />}
             </button>
             <button onClick={onLogin}
-              className="bg-gold-500 hover:bg-gold-400 text-indigo-900 px-4 py-1.5 rounded-lg text-sm font-bold transition">
+              className="bg-gold-500 hover:bg-gold-400 text-indigo-900 px-3.5 py-1.5 rounded-lg text-sm font-bold transition">
               {l.login}
             </button>
           </div>
@@ -163,7 +162,7 @@ export default function Landing({ onGetStarted, onLogin }) {
                       ...(course.photoUrls || (course.photoUrl ? [course.photoUrl] : [])).map(url => ({ type: 'image', url })),
                       ...(course.videoUrls || (course.introVideoUrl ? [course.introVideoUrl] : [])).map(url => ({ type: 'video', url }))
                     ]}
-                    imageClassName="w-full h-56 rounded-xl object-cover"
+                    imageClassName="w-full h-auto max-h-[32rem] rounded-xl object-contain"
                     videoClassName="w-full rounded-xl max-h-96"
                     dotClassName="bg-gray-300 dark:bg-gray-600"
                   />
@@ -231,7 +230,7 @@ export default function Landing({ onGetStarted, onLogin }) {
                     ...(promo.photoUrls || []).map(url => ({ type: 'image', url })),
                     ...(promo.videoUrls || []).map(url => ({ type: 'video', url }))
                   ]}
-                  imageClassName="w-full h-56 rounded-xl object-cover"
+                  imageClassName="w-full h-auto max-h-[32rem] rounded-xl object-contain"
                   videoClassName="w-full rounded-xl max-h-96"
                   dotClassName="bg-gray-300 dark:bg-gray-600"
                 />

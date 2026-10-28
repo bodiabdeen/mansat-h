@@ -93,6 +93,22 @@ export default function Layout({ userData, page, setPage, activeRole, switchRole
     i18n.changeLanguage(next)
   }
 
+  const roleSwitcher = (cls, optCls) => roles.length > 1 && (
+    <select value={activeRole} onChange={e => switchRole(e.target.value)} className={cls}>
+      {roles.map(r => (
+        <option key={r} value={r} className={optCls}>{rLabels[r] || r}</option>
+      ))}
+    </select>
+  )
+  const langButton = (cls) => (
+    <button onClick={toggleLang} className={cls}>{lang === 'ar' ? 'EN' : 'ع'}</button>
+  )
+  const themeButton = (cls) => (
+    <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className={cls}>
+      <Icon e={theme === 'dark' ? '☀️' : '🌙'} className="inline-block w-5 h-5 align-[-0.35em]" />
+    </button>
+  )
+
   useEffect(() => {
     if (activeRole === 'admin') return
     const fetchUnread = async () => {
@@ -120,30 +136,22 @@ export default function Layout({ userData, page, setPage, activeRole, switchRole
 
       {/* Top Bar */}
       <header className="bg-indigo-600 dark:bg-indigo-800 text-white px-4 py-3 flex items-center justify-between shadow">
-        <div className="flex items-center gap-2">
-          <button className="md:hidden text-xl" onClick={() => setMenuOpen(!menuOpen)}>☰</button>
-          <BrandMark className="w-9 h-7" />
-          <span className="text-lg font-bold" dir="rtl">بروف <span className="font-normal opacity-80">| PROF</span></span>
+        <div className="flex items-center gap-2 w-full justify-between md:w-auto md:justify-start">
+          <button className="md:hidden text-xl relative px-1" onClick={() => setMenuOpen(!menuOpen)} aria-label="menu">
+            ☰
+            {unreadCount > 0 && <span className="absolute -top-0.5 -end-0.5 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-indigo-600 dark:ring-indigo-800" />}
+          </button>
+          <div className="flex items-center gap-2">
+            <BrandMark className="w-9 h-7" />
+            <span className="text-lg font-bold" dir="rtl">بروف <span className="font-normal opacity-80">| PROF</span></span>
+          </div>
         </div>
-        <div className="flex items-center gap-3 text-sm">
-          {roles.length > 1 && (
-            <select
-              value={activeRole}
-              onChange={e => switchRole(e.target.value)}
-              className="bg-white/20 hover:bg-white/30 px-2 py-1 rounded-lg text-white text-xs">
-              {roles.map(r => (
-                <option key={r} value={r} className="text-gray-800">{rLabels[r] || r}</option>
-              ))}
-            </select>
-          )}
-          <button onClick={toggleLang} className="bg-white/20 hover:bg-white/30 px-2 py-1 rounded-lg">
-            {lang === 'ar' ? 'EN' : 'ع'}
-          </button>
-          <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            className="bg-white/20 hover:bg-white/30 px-2 py-1 rounded-lg">
-            <Icon e={theme === 'dark' ? '☀️' : '🌙'} className="inline-block w-5 h-5 align-[-0.35em]" />
-          </button>
-          <span className="hidden md:block opacity-80">{userData?.name}</span>
+        {/* Desktop: full controls. Mobile: the same controls live in the menu drawer. */}
+        <div className="hidden md:flex items-center gap-3 text-sm">
+          {roleSwitcher('bg-white/20 hover:bg-white/30 px-2 py-1 rounded-lg text-white text-xs', 'text-gray-800')}
+          {langButton('bg-white/20 hover:bg-white/30 px-2 py-1 rounded-lg')}
+          {themeButton('bg-white/20 hover:bg-white/30 px-2 py-1 rounded-lg')}
+          <span className="opacity-80">{userData?.name}</span>
           <button onClick={() => signOut(auth)}
             className="bg-white/20 hover:bg-white/30 px-2 py-1 rounded-lg">
             {labels.logout}
@@ -176,7 +184,7 @@ export default function Layout({ userData, page, setPage, activeRole, switchRole
         {/* Mobile menu */}
         {menuOpen && (
           <div className="fixed inset-0 z-50 flex">
-            <div className="w-56 bg-white dark:bg-gray-800 shadow-xl flex flex-col py-4 gap-1">
+            <div className="w-64 bg-white dark:bg-gray-800 shadow-xl flex flex-col py-4 gap-1 overflow-y-auto">
               <div className="px-4 pb-2 flex items-center gap-2 font-bold text-indigo-600 dark:text-indigo-400" dir="rtl">
                 <BrandMark className="w-8 h-6" />
                 بروف | PROF
@@ -197,6 +205,22 @@ export default function Layout({ userData, page, setPage, activeRole, switchRole
                   )}
                 </button>
               ))}
+
+              {/* Account controls, moved out of the top bar on mobile */}
+              <div className="mt-auto px-4 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-3">
+                {userData?.name && (
+                  <div className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">{userData.name}</div>
+                )}
+                {roleSwitcher('w-full bg-gray-100 dark:bg-gray-700 px-2 py-2 rounded-lg text-sm text-gray-800 dark:text-white', '')}
+                <div className="flex gap-2">
+                  {langButton('flex-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-white px-2 py-2 rounded-lg text-sm')}
+                  {themeButton('flex-1 bg-gray-100 dark:bg-gray-700 px-2 py-2 rounded-lg text-sm')}
+                </div>
+                <button onClick={() => signOut(auth)}
+                  className="w-full bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 px-2 py-2 rounded-lg text-sm font-medium">
+                  {labels.logout}
+                </button>
+              </div>
             </div>
             <div className="flex-1 bg-black/40" onClick={() => setMenuOpen(false)} />
           </div>

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 const SLIDE_MS = 5000
 
-export default function PromoCarousel({ media, imageClassName = 'w-full h-36 rounded-xl object-cover', videoClassName = 'w-full rounded-xl max-h-52', dotClassName = 'bg-white/40' }) {
+export default function PromoCarousel({ media, imageClassName = 'w-full h-auto max-h-[32rem] rounded-xl object-contain', videoClassName = 'w-full rounded-xl max-h-52', dotClassName = 'bg-white/40' }) {
   const [index, setIndex] = useState(0)
   const playingRef = useRef(false)
 
